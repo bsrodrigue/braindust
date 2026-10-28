@@ -24,6 +24,9 @@ bool Ui::resize() {
   int w = GetScreenWidth(), h = GetScreenHeight();
   if (w == RW && h == RH) return false;
   RW = w; RH = h;
+  // fonts are cached per pixel size, and a new scale means new sizes: drop the old ones or every resize leaks
+  for (auto& [key, f] : cache_) if (f.texture.id != GetFontDefault().texture.id) UnloadFont(f);
+  cache_.clear();
   S = std::min(h / 540.f, w / 600.f); VW = w / S; VH = h / S;
   return true;
 }

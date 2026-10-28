@@ -545,9 +545,10 @@ void World::updateEnemies(float dt) {
     if (P.parry > 0 && P.parryMove >= 0) { parried(e); continue; }
     if (P.inv > 0) continue;
     hurt(T.num("contactDamage", 12), P.x >= e.x ? 1.f : -1.f);
-    if (float k = T.num("contactDust"); k > 0) {  // it pulls stardust out of your skull
+    if (float k = T.num("contactDust"); k > 0 && outcome == Outcome::Playing) {  // it pulls stardust out of your skull
       P.dust = std::min(100.f, P.dust + k);
       burst(cx, headY(), 14, hex("#8c7aa8"), 80, -20, 1);
+      if (P.dust >= 100) die("Something drank the last of your mind.");
     }
     if (chaser) { e.mode = EnemyMode::Recover; e.mt = T.num("recoverTime", .8f); }
   }

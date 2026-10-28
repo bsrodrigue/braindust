@@ -1,5 +1,6 @@
 // Minimal JSON reader and writer: enough for levels/*.json, tunables.json and data/*.json. Throws std::runtime_error on bad input.
 #pragma once
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
@@ -103,6 +104,7 @@ struct Json {
         case 'f': out += '\f'; break;
         case 'u': {  // BMP code point to UTF-8
           if (i + 4 > s.size()) fail("bad \\u escape", i);
+          for (size_t k = i; k < i + 4; k++) if (!std::isxdigit((unsigned char)s[k])) fail("bad \\u escape", k);
           unsigned cp = std::stoul(s.substr(i, 4), nullptr, 16);
           i += 4;
           if (cp < 0x80) out += char(cp);

@@ -20,7 +20,7 @@ class Scene3D {
   bool hasDreamer() const { return dreamer_.ok; }  // the portal skull model loaded
   const std::vector<Vector3>& crackAnchors() const { return crackAnchors_; }
   const std::vector<TowerLight>& towerLights() const { return towerLights_; }
-  bool farLeviathanVisible(const World& w) const { return !w.nearActive && w.cam.y > 1200; }
+  bool farLeviathanVisible(const World& w) const { return farPass_ && !w.nearActive; }
   void farLeviathanEyes(Vector3 out[2]) const;
 
  private:
@@ -42,6 +42,7 @@ class Scene3D {
   struct { bool ok = false; Matrix m; Vector3 eye; } dreamer_;
   float levT_ = 0;
   int lastPass_ = -1;
+  bool farPass_ = false;  // this 40 s pass belongs to the far leviathan (every third one is the near one's)
   std::vector<Seg> farLev_ = std::vector<Seg>(48), nearLev_ = std::vector<Seg>(48);
 
   Material sceneMat(Color c);

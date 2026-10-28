@@ -47,7 +47,10 @@ void Renderer::resize(World& w) {
   w.view = {ui.VW, ui.VH};
 }
 
-Vector2 Renderer::toScreen(const World& w, float wx, float wy) const { return {(wx - w.cam.x) * ui.S, (wy - w.cam.y) * ui.S}; }
+Vector2 Renderer::toScreen(const World& w, float wx, float wy, bool shaken) const {
+  Vector2 k = shaken ? shake_ : Vector2{0, 0};
+  return {(wx - w.cam.x + k.x) * ui.S, (wy - w.cam.y + k.y) * ui.S};
+}
 Vector2 Renderer::project(const World& w, const Camera3D& c, Vector3 p) const {
   Vector2 s = GetWorldToScreenEx(p, c, ui.RW, ui.RH);
   return {s.x / ui.S + w.cam.x, s.y / ui.S + w.cam.y};
@@ -76,8 +79,8 @@ bool Renderer::screenshot(const std::string& path) const {
 void Renderer::worldPass(const World& w, const Scene3D& s) {
   const float S = ui.S, VW = ui.VW, VH = ui.VH;
   const int RW = ui.RW, RH = ui.RH;
-  float sx = (frand() - .5f) * w.shake * 24, sy = (frand() - .5f) * w.shake * 24;
-  Camera2D c2{{0, 0}, {w.cam.x - sx, w.cam.y - sy}, 0, S};
+  shake_ = {(frand() - .5f) * w.shake * 24, (frand() - .5f) * w.shake * 24};
+  Camera2D c2{{0, 0}, {w.cam.x - shake_.x, w.cam.y - shake_.y}, 0, S};
   BeginTextureMode(world_);
   ClearBackground(BLANK);
   rlDisableBackfaceCulling();
@@ -164,14 +167,17 @@ void Renderer::darknessPass(const World& w, const Scene3D& s) {
   ClearBackground({0, 1, 2, (unsigned char)(dark * 255)});
   rlSetBlendFactors(RL_ZERO, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD);  // destination-out
   BeginBlendMode(BLEND_CUSTOM);
-  auto hole = [&](float x, float y, float r) { Vector2 p = toScreen(w, x, y); DrawCircleGradient(int(p.x), int(p.y), r * ui.S, WHITE, BLANK); };
+  auto hole = [&](float x, float y, float r, bool shaken = true) {  // 3D sources do not shake: their holes stay on them
+    Vector2 p = toScreen(w, x, y, shaken);
+    DrawCircleGradient(int(p.x), int(p.y), r * ui.S, WHITE, BLANK);
+  };
   if (!w.inPocket) {
     const Player& P = w.player;
     if (w.outcome == Outcome::Playing) hole(P.x + P.w / 2, w.headY() + 20, w.lightR());
     for (auto& sh : w.shots) hole(sh.x, sh.y, 80 + sh.r * 4);
     Vector2 pc = w.portalCentre();
-    hole(pc.x, pc.y, s.hasDreamer() ? 300 + std::sin(w.t * 1.3f) * 25 : 130);
-    for (auto& a : s.crackAnchors()) if (inFront(s.camera, a)) { Vector2 p = project(w, s.camera, a); hole(p.x, p.y, 220); }
+    hole(pc.x, pc.y, s.hasDreamer() ? 300 + std::sin(w.t * 1.3f) * 25 : 130, !s.hasDreamer());  // the dreamer is 3D
+    for (auto& a : s.crackAnchors()) if (inFront(s.camera, a)) { Vector2 p = project(w, s.camera, a); hole(p.x, p.y, 220, false); }
     for (auto& l : w.level.lights) hole(l.x, l.y, l.r);
     for (auto& wr : w.level.wrappers) if (!wr.taken && w.seen(wr.x, wr.y, wr.reveal)) hole(wr.x, wr.y, 50);
     for (auto& it : w.level.items) if (!it.taken && w.seen(it.x, it.y, it.reveal)) hole(it.x, it.y, 40);

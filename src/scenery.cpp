@@ -61,7 +61,7 @@ Texture2D Renderer::tile(const std::string& name) {
   Texture2D tx{};
   for (const char* dir : {"platformer", "environment", "collectable"}) {
     std::string path = std::string("assets/tileset/") + dir + "/" + name + ".png";
-    if (FileExists(path.c_str())) { tx = LoadTexture(path.c_str()); GenTextureMipmaps(&tx); SetTextureFilter(tx, TEXTURE_FILTER_TRILINEAR); break; }
+    if (FileExists(path.c_str())) { tx = LoadTexture(path.c_str()); GenTextureMipmaps(&tx); SetTextureFilter(tx, TEXTURE_FILTER_TRILINEAR); SetTextureWrap(tx, TEXTURE_WRAP_CLAMP); break; }
   }
   if (!tx.id) TraceLog(LOG_WARNING, "tileset: no image named %s", name.c_str());
   return tiles_[name] = tx;

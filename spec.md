@@ -346,6 +346,8 @@ Lower path: crates to hop, a fire and a villager.
 
 ## 13. Changelog
 
+- **2026-10-28** Fixes: seam lines between tiles (textures now clamp instead of repeat at their edges); light holes and inscriptions no longer jitter against the world during screen shake; fonts no longer leak on every window resize; the far leviathan no longer hangs frozen during the near one's passes; a leech's bite can be the stardust that kills you, with its own message; malformed atlases and `\u` escapes fail cleanly; the editor opens levels without `lurkers`.
+
 - **2026-10-28** The Lake of Crocos is a late-game area of horrifying, hostile crocos; the Croco Mage is powerful but no smarter than a human mage, and his origin is open.
 - **2026-10-28** World structure: areas, each its own biome (7b). Two new areas from the concept art in `docs/Concept-Arts/`: the Lake of Crocos and the Lake of Blood.
 

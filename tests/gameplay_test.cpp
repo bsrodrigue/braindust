@@ -5,7 +5,9 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <functional>
 
+#include "../src/json.hpp"
 #include "../src/util.hpp"
 #include "../src/world.hpp"
 
@@ -185,6 +187,26 @@ void roundTrip() {  // the tune pages save numbers back into the file, keeping i
   assert(r.list[0].num("resist.slash") == .25f && r.list[0].str("draw") == s.list[0].str("draw") && r.list.size() == s.list.size());
 }
 
+void leechDrainsTheLastOfYou() {  // its touch can be the stardust that kills you, and says so
+  Game g({{"leech", 486, 1010}});
+  g.P().dust = 100 - enemy("leech").num("contactDust") / 2;
+  g.frame();
+  assert(g.w.outcome == Outcome::Dead && g.w.msg == "Something drank the last of your mind.");
+}
+
+bool throws(const std::function<void()>& f) {
+  try { f(); } catch (const std::exception&) { return true; }
+  return false;
+}
+
+void badData() {  // malformed files fail with an error instead of reading garbage
+  assert(Json::parse(R"("\u00e9")").str == "\xc3\xa9");
+  assert(throws([] { Json::parse(R"("\u12zz")"); }));
+  SaveFileText("build/bad_atlas.json", (char*)R"({ "cell": [10, 10], "anchor": [5, 10], "anims": { "idle": { "row": 0, "frames": 1, "head": [[0]] } } })");
+  SaveFileText("build/bad_character.json", (char*)R"({ "atlas": "build/bad_atlas.json", "states": { "idle": { "anim": "idle" } } })");
+  assert(throws([] { parseCharacter("build/bad_character.json"); }));
+}
+
 }  // namespace
 
 int main() {
@@ -200,5 +222,7 @@ int main() {
   seals();
   items();
   roundTrip();
+  leechDrainsTheLastOfYou();
+  badData();
   std::puts("gameplay_test: ok");
 }

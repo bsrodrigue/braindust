@@ -188,7 +188,7 @@ void Scene3D::update(float dt, World& w) {
   float X = (w.cam.x + w.view.x / 2) / 100, Y = -(w.cam.y + w.view.y / 2) / 100;
   camera.position = V3(X, Y, 10); camera.target = V3(X, Y, 0); camera.up = V3(0, 1, 0);
   camera.fovy = 2 * std::atan(w.view.y / 200 / 10) * RAD2DEG; camera.projection = CAMERA_PERSPECTIVE;
-  if (w.inPocket) return;
+  if (w.inPocket) { farPass_ = w.nearActive = false; return; }
   // a leviathan passes every 40 s; every third pass it comes between you and the camera
   levT_ += dt;
   int n = int(levT_ / 40);
@@ -196,7 +196,8 @@ void Scene3D::update(float dt, World& w) {
   bool isNear = n % 3 == 2 && w.cam.y > 1800;
   bool was = w.nearActive;
   w.nearActive = isNear && k > .2f && k < .6f;
-  if (!isNear && w.cam.y > 1200) {
+  farPass_ = !isNear && w.cam.y > 1200;  // only posed then, so only drawn then: otherwise it would hang frozen
+  if (farPass_) {
     poseLeviathan(farLev_, 1, X + dir * (-90 + 180 * k), Y - 4 + std::sin(levT_ * .3f) * 2, -40, dir, levT_, 1.6f);
     if (lastPass_ != n && k > .05f) { lastPass_ = n; w.audio.groan(false); }
   }
