@@ -1,6 +1,7 @@
 // Draws a frame: 3D background (bg) + 2D world with darkness (world) + 3D near pass (fg) -> post shader -> HUD.
 // renderer.cpp: passes and compositing. scenery.cpp: sky, tiles, props. actors.cpp: player, enemies, pickups. hud.cpp: HUD.
 #pragma once
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -16,7 +17,9 @@ class Renderer {
 
   void load();
   void resize(World& w);  // render targets follow the window; also sets the world's view size
-  void draw(const World& w, Scene3D& scene3d, Panel* panel, bool help);  // panel: drawn over the HUD when open
+  // overlay: drawn over the HUD, in HUD units (menus, tune pages, help, touch controls)
+  void draw(const World& w, Scene3D& scene3d, const std::function<void()>& overlay);
+  void drawHelp(bool touch);
   bool screenshot(const std::string& path) const;
 
  private:
@@ -34,7 +37,7 @@ class Renderer {
   void darknessPass(const World& w, const Scene3D& s);
   void lightsPass(const World& w, const Scene3D& s, Camera2D c2);
   void inscriptions(const World& w);
-  void composite(const World& w, Panel* panel);
+  void composite(const World& w, const std::function<void()>& overlay);
   Vector2 toScreen(const World& w, float wx, float wy, bool shaken = true) const;  // shaken: moves with the 2D world's shake
   Vector2 project(const World& w, const Camera3D& c, Vector3 p) const;  // a 3D point to world px
 
@@ -57,7 +60,6 @@ class Renderer {
 
   // hud.cpp
   void drawHud(const World& w);
-  void drawHelp();
 };
 
 Vector2 lurePos(const Enemy& e);

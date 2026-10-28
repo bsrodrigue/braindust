@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The game's files, copied from the project root into the APK's assets under the paths the game opens
+// (levels/, data/, shaders/, characters/, assets/, tunables.json). Blender sources and the tileset zip stay out.
+def gameAssets = layout.buildDirectory.dir('gameAssets')
+def stageGameAssets = tasks.register('stageGameAssets', Sync) {
+    from(rootProject.file('..')) {
+        include 'levels/*.json', 'data/*.json', 'shaders/*', 'characters/*.json', 'tunables.json'
+        include 'assets/*.glb', 'assets/player.png', 'assets/player.json', 'assets/fonts/*', 'assets/tileset/**/*.png'
+    }
+    into gameAssets
+}
+
+android {
+    namespace 'io.github.bsrodrigue.braindust'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.bsrodrigue.braindust'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '0.1'
+        ndk {
+            abiFilters 'arm64-v8a', 'x86_64'  // phones; the emulator
+        }
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=c++_static'
+            }
+        }
+    }
+
+    // the same CMakeLists.txt as the desktop: on Android it builds raylib for Android and the game as libbraindust.so
+    externalNativeBuild {
+        cmake {
+            path file('../../CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+
+    sourceSets {
+        main {
+            assets.srcDir(gameAssets)
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.debug  // installable for testing; use your own key to publish
+        }
+    }
+}
+
+tasks.named('preBuild') { dependsOn stageGameAssets }

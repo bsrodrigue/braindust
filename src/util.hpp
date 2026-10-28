@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "platform.hpp"
 #include "raylib.h"
 #include "raymath.h"
 
@@ -33,10 +34,4 @@ inline float nz(float x, float y, float z) {  // cheap deterministic noise for l
          std::sin(y * 7.3f + x * 5.9f - z * 2.1f) * .12f;
 }
 
-inline std::string readFile(const std::string& path) {  // throws when missing
-  char* txt = LoadFileText(path.c_str());
-  if (!txt) throw std::runtime_error("cannot read " + path);
-  std::string s = txt;
-  UnloadFileText(txt);
-  return s;
-}
+inline std::string readFile(const std::string& path) { return platform::readText(path); }  // throws when missing

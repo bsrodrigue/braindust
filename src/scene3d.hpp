@@ -28,7 +28,7 @@ class Scene3D {
   enum class Kind { Rock, Skull, UniverseSkull, Tower, ProceduralSkull, Floor };
   struct Static { Kind kind; int aux; Matrix m; };  // aux: rock mesh index, or 1 for the playfield skulls
 
-  Shader sceneSh_{};
+  Shader sceneSh_{}, unlitSh_{};  // every 3D draw uses one of ours: raylib's default shader is mediump on OpenGL ES
   Material rock_{}, bone_{}, floor_{}, skin_{}, fin_{}, tooth_{}, eye_{}, galaxyMat_{}, black_{};
   Mesh seg_{}, spine_{}, fang_{}, sphere_{}, floorMesh_{};
   std::vector<Mesh> rocks_;

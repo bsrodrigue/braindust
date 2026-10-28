@@ -7,7 +7,7 @@
 
 Tunables loadTunables(const std::string& path) {
   Tunables t;
-  if (!FileExists(path.c_str())) return t;
+  if (!platform::exists(path)) return t;
   try {
     Json j = Json::parse(readFile(path));
     for (auto& f : TUNABLE_FIELDS) t.*f.field = j.numOr(f.name, t.*f.field);
@@ -20,5 +20,5 @@ bool saveTunables(const std::string& path, const Tunables& t) {
   for (size_t i = 0; i < std::size(TUNABLE_FIELDS); i++)
     out += TextFormat(" \"%s\": %g%s\n", TUNABLE_FIELDS[i].name, t.*TUNABLE_FIELDS[i].field, i + 1 < std::size(TUNABLE_FIELDS) ? "," : "");
   out += "}\n";
-  return SaveFileText(path.c_str(), out.data());
+  return platform::writeText(path, out);
 }

@@ -30,8 +30,8 @@ void glow(float x, float y, float r, Color c) { DrawCircleGradient(int(x), int(y
 
 void Renderer::load() {
   ui.loadFonts();
-  post_ = LoadShader(nullptr, "shaders/post.fs");
-  tile_ = LoadShader(nullptr, "shaders/tile.fs");
+  post_ = platform::loadShader(nullptr, "shaders/post.fs");
+  tile_ = platform::loadShader(nullptr, "shaders/tile.fs");
   float sat = .5f;
   SetShaderValue(tile_, GetShaderLocation(tile_, "uSat"), &sat, SHADER_UNIFORM_FLOAT);
   for (int i = 0; i < 700; i++) snow_.push_back({frand() * 2000, frand() * 2000, .05f + frand() * .4f});
@@ -56,14 +56,13 @@ Vector2 Renderer::project(const World& w, const Camera3D& c, Vector3 p) const {
   return {s.x / ui.S + w.cam.x, s.y / ui.S + w.cam.y};
 }
 
-void Renderer::draw(const World& w, Scene3D& scene3d, Panel* panel, bool help) {
+void Renderer::draw(const World& w, Scene3D& scene3d, const std::function<void()>& overlay) {
   scene3d.render(w, bg_, fg_);
   worldPass(w, scene3d);
-  composite(w, panel);
+  composite(w, overlay);
   BeginDrawing();
   ClearBackground(BLACK);
-  DrawTextureRec(final_.texture, {0, 0, float(ui.RW), -float(ui.RH)}, {0, 0}, WHITE);
-  if (help) drawHelp();
+  DrawTexturePro(final_.texture, {0, 0, float(ui.RW), -float(ui.RH)}, {0, 0, float(GetScreenWidth()), float(GetScreenHeight())}, {0, 0}, 0, WHITE);
   EndDrawing();
 }
 
@@ -260,7 +259,7 @@ void Renderer::inscriptions(const World& w) {
   EndBlendMode();
 }
 
-void Renderer::composite(const World& w, Panel* panel) {
+void Renderer::composite(const World& w, const std::function<void()>& overlay) {
   BeginTextureMode(final_);
   BeginShaderMode(post_);
   auto set = [&](const char* name, const void* v, int type) { SetShaderValue(post_, GetShaderLocation(post_, name), v, type); };
@@ -282,6 +281,6 @@ void Renderer::composite(const World& w, Panel* panel) {
   DrawTextureRec(bg_.texture, {0, 0, float(ui.RW), -float(ui.RH)}, {0, 0}, WHITE);
   EndShaderMode();
   drawHud(w);
-  if (panel && panel->open) panel->draw(ui);
+  if (overlay) overlay();
   EndTextureMode();
 }

@@ -100,7 +100,8 @@ template <class Seg> void poseLeviathan(std::vector<Seg>& L, float s, float hx, 
 Material Scene3D::sceneMat(Color c) { Material m = LoadMaterialDefault(); m.shader = sceneSh_; m.maps[MATERIAL_MAP_DIFFUSE].color = c; return m; }
 
 void Scene3D::load() {
-  sceneSh_ = LoadShader("shaders/scene.vs", "shaders/scene.fs");
+  sceneSh_ = platform::loadShader("shaders/scene.vs", "shaders/scene.fs");
+  unlitSh_ = platform::loadShader("shaders/scene.vs", "shaders/unlit.fs");
   sceneSh_.locs[SHADER_LOC_MATRIX_MODEL] = GetShaderLocation(sceneSh_, "matModel");
   sceneSh_.locs[SHADER_LOC_MATRIX_NORMAL] = GetShaderLocation(sceneSh_, "matNormal");
   Image g = galaxyImage(); galaxy = LoadTextureFromImage(g); UnloadImage(g);
@@ -109,8 +110,8 @@ void Scene3D::load() {
   rock_ = sceneMat(hex("#161b1e")); bone_ = sceneMat(hex("#4f4b42")); floor_ = sceneMat(hex("#15181a"));
   skin_ = sceneMat(hex("#191d1c")); fin_ = sceneMat(hex("#2b2e29")); tooth_ = sceneMat(hex("#b8b2a0"));
   eye_ = sceneMat(WHITE); eye_.maps[MATERIAL_MAP_DIFFUSE].texture = sclera_;
-  galaxyMat_ = LoadMaterialDefault(); galaxyMat_.maps[MATERIAL_MAP_DIFFUSE].texture = galaxy;
-  black_ = LoadMaterialDefault(); black_.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
+  galaxyMat_ = LoadMaterialDefault(); galaxyMat_.shader = unlitSh_; galaxyMat_.maps[MATERIAL_MAP_DIFFUSE].texture = galaxy;
+  black_ = LoadMaterialDefault(); black_.shader = unlitSh_; black_.maps[MATERIAL_MAP_DIFFUSE].color = BLACK;
   seg_ = roughened(GenMeshSphere(1, 14, 20), .22f, 2.4f);
   spine_ = GenMeshCone(.12f, 1.6f, 5);
   fang_ = GenMeshCone(.06f, .9f, 4);

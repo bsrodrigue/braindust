@@ -73,7 +73,7 @@ void main() {
   col = mix(vec3(lum), col, .86) * mix(vec3(1.05, 1.0, .93), vec3(.95, 1.02, 1.04), sea);  // warm dusk above, cool sea below
   col += vec3(.05, .0, .08) * uWarp * (.5 + .5 * sin(uTime * 3.0 + uv.y * 20.0));
   // vignette and grain
-  col *= mix(.55, 1.0, smoothstep(.95, .3, length(dc * vec2(1.15, 1.0))));
+  col *= mix(.55, 1.0, 1.0 - smoothstep(.3, .95, length(dc * vec2(1.15, 1.0))));  // smoothstep needs edge0 < edge1
   col += (hash(gl_FragCoord.xy + fract(uTime) * 91.0) - .5) * .045;
   finalColor = vec4(col, 1.0);
 }
