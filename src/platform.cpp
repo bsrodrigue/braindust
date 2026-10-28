@@ -19,6 +19,7 @@ namespace {
 float scaleOverride = 0;
 }
 void setRenderScale(float s) { scaleOverride = s; }
+float renderScaleOverride() { return scaleOverride; }
 
 #if defined(__ANDROID__)
 namespace {
@@ -71,7 +72,7 @@ std::vector<std::string> listFiles(const std::string& dir, const std::string& ex
   return out;
 }
 
-float renderScale() { return scaleOverride > 0 ? scaleOverride : std::min(1.f, 720.f / std::max(1, GetScreenHeight())); }
+
 
 #else
 
@@ -101,7 +102,7 @@ std::vector<std::string> listFiles(const std::string& dir, const std::string& ex
   return out;
 }
 
-float renderScale() { return scaleOverride > 0 ? scaleOverride : 1; }
+
 
 #endif
 

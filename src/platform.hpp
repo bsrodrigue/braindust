@@ -22,9 +22,8 @@ std::vector<std::string> listFiles(const std::string& dir, const std::string& ex
 Shader loadShader(const char* vsPath, const char* fsPath);  // either may be nullptr: raylib's default stage
 std::string toGlsl100(const std::string& src, bool vertex);  // the rewrite (exposed for tests)
 
-// Render targets relative to the screen: phones have dense, very wide screens and the post pass is heavy, so on
-// Android the game renders at most 720 px tall and scales up.
-float renderScale();
-void setRenderScale(float s);  // > 0 overrides it (--scale), 0 goes back to the default
+// --scale: render targets at this fraction of the screen, whatever the graphics quality says; 0 when not set
+float renderScaleOverride();
+void setRenderScale(float s);
 
 }  // namespace platform

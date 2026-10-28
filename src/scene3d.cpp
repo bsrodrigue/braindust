@@ -88,6 +88,61 @@ Image scleraImage() {  // bloodshot veins crawling toward the iris side
   return img;
 }
 
+// Vertex clustering: snap the vertices to a grid of `cells` along the longest side, merge each cell's vertices
+// (positions, normals, colours and texture coordinates averaged) and drop the triangles that collapse.
+// The skull's shell goes from 26k triangles to a few thousand, which a skull a few dozen pixels tall cannot show.
+Mesh simplified(const Mesh& m, int cells) {
+  BoundingBox b = GetMeshBoundingBox(m);
+  Vector3 size = Vector3Subtract(b.max, b.min);
+  float cell = std::max({size.x, size.y, size.z}) / cells;
+  auto cellOf = [&](int i) {
+    auto q = [&](float v, float lo) { return (long long)std::floor((v - lo) / cell); };
+    return (q(m.vertices[3 * i], b.min.x) * 4096 + q(m.vertices[3 * i + 1], b.min.y)) * 4096 + q(m.vertices[3 * i + 2], b.min.z);
+  };
+  std::unordered_map<long long, int> slot;  // cell -> new vertex
+  std::vector<int> remap(m.vertexCount);
+  std::vector<float> pos, nrm, uv, col;
+  std::vector<int> count;
+  for (int i = 0; i < m.vertexCount; i++) {
+    auto [it, fresh] = slot.try_emplace(cellOf(i), int(count.size()));
+    int k = it->second;
+    if (fresh) { pos.resize(pos.size() + 3); nrm.resize(nrm.size() + 3); uv.resize(uv.size() + 2); col.resize(col.size() + 4); count.push_back(0); }
+    remap[i] = k;
+    count[k]++;
+    for (int c = 0; c < 3; c++) pos[3 * k + c] += m.vertices[3 * i + c];
+    if (m.normals) for (int c = 0; c < 3; c++) nrm[3 * k + c] += m.normals[3 * i + c];
+    if (m.texcoords) for (int c = 0; c < 2; c++) uv[2 * k + c] += m.texcoords[2 * i + c];
+    if (m.colors) for (int c = 0; c < 4; c++) col[4 * k + c] += m.colors[4 * i + c];
+  }
+  std::vector<unsigned short> tris;
+  int faces = m.indices ? m.triangleCount : m.vertexCount / 3;
+  for (int f = 0; f < faces; f++) {
+    int a = remap[m.indices ? m.indices[3 * f] : 3 * f], b2 = remap[m.indices ? m.indices[3 * f + 1] : 3 * f + 1],
+        c = remap[m.indices ? m.indices[3 * f + 2] : 3 * f + 2];
+    if (a != b2 && b2 != c && a != c) tris.insert(tris.end(), {(unsigned short)a, (unsigned short)b2, (unsigned short)c});
+  }
+  Mesh out{};
+  int n = int(count.size());
+  out.vertexCount = n;
+  out.triangleCount = int(tris.size() / 3);
+  out.vertices = (float*)MemAlloc(n * 3 * sizeof(float));
+  out.normals = (float*)MemAlloc(n * 3 * sizeof(float));
+  out.texcoords = (float*)MemAlloc(n * 2 * sizeof(float));
+  if (m.colors) out.colors = (unsigned char*)MemAlloc(n * 4);
+  out.indices = (unsigned short*)MemAlloc(tris.size() * sizeof(unsigned short));
+  for (int k = 0; k < n; k++) {
+    float w = 1.f / count[k];
+    for (int c = 0; c < 3; c++) out.vertices[3 * k + c] = pos[3 * k + c] * w;
+    Vector3 nv = Vector3Normalize(V3(nrm[3 * k], nrm[3 * k + 1], nrm[3 * k + 2]));
+    out.normals[3 * k] = nv.x; out.normals[3 * k + 1] = nv.y; out.normals[3 * k + 2] = nv.z;
+    for (int c = 0; c < 2; c++) out.texcoords[2 * k + c] = uv[2 * k + c] * w;
+    if (m.colors) for (int c = 0; c < 4; c++) out.colors[4 * k + c] = (unsigned char)std::lround(col[4 * k + c] * w);
+  }
+  std::copy(tris.begin(), tris.end(), out.indices);
+  UploadMesh(&out, false);
+  return out;
+}
+
 template <class Seg> void poseLeviathan(std::vector<Seg>& L, float s, float hx, float hy, float hz, float dir, float time, float amp) {
   for (int i = 0; i < LEV_SEGS; i++) {
     float r = (i < 5 ? 2.2f + i * .55f : 4.6f * std::pow(1 - i / float(LEV_SEGS), .8f) + .3f) * s;
@@ -123,6 +178,7 @@ void Scene3D::load() {
   smoothNormals(floorMesh_);
   skull_ = LoadModel("assets/giant_skull.glb");
   skullOK_ = IsModelValid(skull_) && skull_.meshCount >= 1;
+  if (skullOK_) skullLod_ = simplified(skull_.meshes[0], 22);
   tower_ = LoadModel("assets/drowned_tower.glb");
   towerOK_ = IsModelValid(tower_);
 }
@@ -183,6 +239,39 @@ void Scene3D::place(const World& w) {
     dreamer_.eye = Vector3Transform(Vector3Scale(CRACK_DIR, .42f), d);
     statics_.push_back({Kind::Skull, 1, inPlay(w.cracks[1].r, 1.25f, V3(.2f, -.7f, -.5f))});
   }
+  for (auto& s : statics_) {  // bounding spheres: the eight corners of the local box, transformed (rotation and scale count)
+    BoundingBox b = localBox(s);
+    Vector3 lo{1e9f, 1e9f, 1e9f}, hi{-1e9f, -1e9f, -1e9f};
+    for (int k = 0; k < 8; k++) {
+      Vector3 p = Vector3Transform(V3(k & 1 ? b.max.x : b.min.x, k & 2 ? b.max.y : b.min.y, k & 4 ? b.max.z : b.min.z), s.m);
+      lo = Vector3Min(lo, p); hi = Vector3Max(hi, p);
+    }
+    s.c = Vector3Scale(Vector3Add(lo, hi), .5f);
+    s.r = Vector3Distance(lo, hi) / 2;
+  }
+}
+
+BoundingBox Scene3D::localBox(const Static& s) const {
+  switch (s.kind) {
+    case Kind::Rock: return GetMeshBoundingBox(rocks_[s.aux]);
+    case Kind::Floor: return GetMeshBoundingBox(floorMesh_);
+    case Kind::ProceduralSkull: return GetMeshBoundingBox(seg_);
+    case Kind::Tower: return GetModelBoundingBox(tower_);
+    case Kind::Skull:
+    case Kind::UniverseSkull: return GetModelBoundingBox(skull_);
+  }
+  return {};
+}
+
+// the camera looks straight down -z from z = 10: a sphere is in view when it is in front and within the view's
+// half-widths at its depth (widened by its radius, measured across the slanted side planes)
+bool Scene3D::inView(const Static& s, float aspect) const {
+  float d = camera.position.z - s.c.z;
+  if (d + s.r <= 0) return false;
+  if (d <= s.r) return true;  // around the camera
+  float ty = std::tan(camera.fovy * DEG2RAD / 2), tx = ty * aspect;
+  return std::fabs(s.c.x - camera.position.x) <= d * tx + s.r * std::sqrt(1 + tx * tx) &&
+         std::fabs(s.c.y - camera.position.y) <= d * ty + s.r * std::sqrt(1 + ty * ty);
 }
 
 void Scene3D::update(float dt, World& w) {
@@ -284,7 +373,13 @@ void Scene3D::drawStatic(const Static& s) {
     case Kind::UniverseSkull:
       for (int i = 0; i < skull_.meshCount; i++) {
         Material& mt = skull_.materials[skull_.meshMaterial[i]];
-        if (skull_.meshes[i].colors) { mt.shader = sceneSh_; DrawMesh(skull_.meshes[i], mt, s.m); }
+        if (skull_.meshes[i].colors) {
+          mt.shader = sceneSh_;
+          // small on screen (radius under 35 % of half the view's height): the simplified shell
+          float d = std::max(.01f, camera.position.z - s.c.z), apparent = s.r / (d * std::tan(camera.fovy * DEG2RAD / 2));
+          bool lod = i == 0 && s.kind == Kind::Skull && skullLod_.vertexCount > 0 && apparent < .35f;
+          DrawMesh(lod ? skullLod_ : skull_.meshes[i], mt, s.m);
+        }
         else if (s.kind == Kind::UniverseSkull) {  // the universe sphere: seen from inside, unlit, no fog
           rlDrawRenderBatchActive(); rlSetCullFace(RL_CULL_FACE_FRONT);
           galaxyMat_.maps[MATERIAL_MAP_DIFFUSE].color = s.aux ? hex("#6e6884") : WHITE;
@@ -315,7 +410,10 @@ void Scene3D::render(const World& w, RenderTexture2D& bg, RenderTexture2D& fg) {
     rlEnableBackfaceCulling();
     BeginMode3D(camera);
     setUniforms(fog, .015f, rgb(hex("#6d8e9a"), .5f * (1 - deep) + .22f), rgb(hex("#a8c8d4"), .7f * (1 - deep) + .05f), lights);
-    for (auto& s : statics_) drawStatic(s);
+    float aspect = float(bg.texture.width) / std::max(1, bg.texture.height);
+    drawn_ = 0;
+    for (auto& s : statics_)
+      if (inView(s, aspect)) { drawStatic(s); drawn_++; }
     if (farLeviathanVisible(w)) drawLeviathan(farLev_, false);
     EndMode3D();
   }

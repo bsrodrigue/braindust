@@ -1,22 +1,16 @@
 #version 330
-// Final composite: 3D background (texture0), 2D world with darkness (premultiplied alpha), 3D near pass,
-// then refraction, chromatic aberration, bloom, god rays, caustics, grade, vignette and grain.
-// All layers share one orientation, so everything samples at gl_FragCoord / uRes.
+// Final pass over the merged scene (texture0, from merge.fs: alpha is the 2D world's coverage) and its bloom (texBloom):
+// refraction, chromatic aberration, bloom, god rays, caustics, grade, vignette and grain.
+// The u* switches are the graphics quality (renderer.hpp): each costs texture reads or arithmetic on every pixel.
 uniform sampler2D texture0;
-uniform sampler2D texWorld;
-uniform sampler2D texFg;
+uniform sampler2D texBloom;
 uniform vec2 uRes;
 uniform vec2 uCam;
 uniform float uS, uTime, uShallow, uDeep, uPocket, uWarp;
 uniform float uWaterY;  // screen px from the top where the sea begins; above it is sky and land
 uniform float uDark;    // darkness overlay alpha this frame: lets us tell solid rock (alpha 1) from open water
+uniform float uChroma, uBloom, uRays, uCaustics;  // 0 or 1; uRays: god ray steps, 0 to 16
 out vec4 finalColor;
-
-vec3 sceneAt(vec2 uv) {
-  vec4 w = texture(texWorld, uv), f = texture(texFg, uv);
-  vec3 c = w.rgb + texture(texture0, uv).rgb * (1.0 - w.a);
-  return mix(c, f.rgb, f.a);
-}
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 float caustic(vec2 p, float time) {  // after the classic tileable water caustic
   vec2 q = mod(p * 6.2831, 6.2831) - 250.0, i = q;
@@ -38,35 +32,34 @@ void main() {
   // refraction; places that burst a mage's skull bend the water much harder
   float wob = (.0011 + uDeep * .0007) * sea + uWarp * .006;
   uv += vec2(sin(uv.y * 38.0 + uTime * 1.7) + .5 * sin(uv.y * 71.0 - uTime * 2.3), cos(uv.x * 29.0 + uTime * 1.3)) * wob;
-  float ca = dot(dc, dc) * (.007 + uPocket * .012 + uWarp * .03);
-  vec3 col = vec3(sceneAt(uv + dc * ca).r, sceneAt(uv).g, sceneAt(uv - dc * ca).b);
-  // bloom
-  vec3 bl = vec3(0.0);
-  vec2 px = vec2(1.0) / uRes * (uRes.y / 700.0);
-  for (int i = 0; i < 8; i++) {
-    float a = float(i) * .785 + .3;
-    vec2 o = vec2(cos(a), sin(a));
-    bl += max(sceneAt(uv + o * px * 7.0) - .3, 0.0) + .6 * max(sceneAt(uv + o * px * 18.0) - .28, 0.0);
+  vec4 m = texture(texture0, uv);
+  vec3 col = m.rgb;
+  if (uChroma > .5) {
+    float ca = dot(dc, dc) * (.007 + uPocket * .012 + uWarp * .03);
+    col = vec3(texture(texture0, uv + dc * ca).r, m.g, texture(texture0, uv - dc * ca).b);
   }
-  col += bl * .16;
+  col += texture(texBloom, uv).rgb * uBloom;
   // solid rock gets no water light: god rays, caustics and the teal lift belong to open water
-  float rock = clamp((texture(texWorld, uv).a - uDark) / max(1.0 - uDark, .05), 0.0, 1.0);
+  float rock = clamp((m.a - uDark) / max(1.0 - uDark, .05), 0.0, 1.0);
   // god rays from the surface, broken by the shaft walls
-  if (uShallow > .01 && sea > .5) {
-    vec2 lp = vec2(.35 + sin(uTime * .05) * .15, 1.3), d = (uv - lp) / 16.0, p = uv;
-    float ill = 0.0, decay = 1.0;
+  if (uRays > .5 && uShallow > .01 && sea > .5) {
+    vec2 lp = vec2(.35 + sin(uTime * .05) * .15, 1.3), d = (uv - lp) / uRays, p = uv;
+    float ill = 0.0, decay = 1.0, k = pow(.9, 16.0 / uRays);  // fewer steps: each decays more, over the same distance
     for (int i = 0; i < 16; i++) {
+      if (float(i) >= uRays) break;
       p -= d;
-      float open = (1.0 - p.y) * uRes.y < uWaterY ? 1.0 : 1.0 - texture(texWorld, p).a;  // the sky lets light in
+      float open = (1.0 - p.y) * uRes.y < uWaterY ? 1.0 : 1.0 - texture(texture0, p).a;  // the sky lets light in
       ill += open * (.55 + .45 * sin(p.x * 46.0 + uTime * .4) * sin(p.x * 17.0 - uTime * .25)) * decay;
-      decay *= .9;
+      decay *= k;
     }
-    col += vec3(.32, .5, .55) * ill * .05 * uShallow * sea * (1.0 - rock);
+    col += vec3(.32, .5, .55) * ill * .05 * (16.0 / uRays) * uShallow * sea * (1.0 - rock);
   }
   // world-anchored caustics
-  vec2 wp = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uS + uCam;
-  float cs = caustic(wp / 150.0, uTime * .55) * uShallow * sea * (1.0 - rock);
-  col += col * cs * .45 + vec3(.03, .06, .07) * cs * .12;
+  if (uCaustics > .5 && uShallow > .01) {
+    vec2 wp = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y) / uS + uCam;
+    float cs = caustic(wp / 150.0, uTime * .55) * uShallow * sea * (1.0 - rock);
+    col += col * cs * .45 + vec3(.03, .06, .07) * cs * .12;
+  }
   // grade: teal floor in the shadows, slight desaturation
   float lum = dot(col, vec3(.299, .587, .114));
   col += vec3(.025, .07, .085) * (1.0 - smoothstep(0.0, .25, lum)) * sea * (.6 + .4 * uDeep) * (1.0 - rock * .8);

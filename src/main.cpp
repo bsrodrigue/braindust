@@ -1,11 +1,14 @@
 // Braindust: a 2D thalassophobia action game (raylib), for the desktop and Android.
 // On the desktop, run from anywhere; it finds the project root (the folder holding levels/ and shaders/).
-//   braindust [levels/name.json] [--spawn x,y] [--shot frames out.png] [--touch] [--scale 0.5]
+//   braindust [levels/name.json] [--spawn x,y] [--shot frames out.png] [--touch] [--scale 0.5] [--profile]
+//             [--quality low|medium|high]
 // --touch shows the on-screen controls (the mouse is a finger). On Android they show unless a gamepad is connected,
 // and the files are the APK's assets (see platform.hpp). --scale renders at that fraction of the screen (weak GPUs).
+// --profile shows frame timings (F3 toggles them) and, with --shot, prints their averages.
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -31,11 +34,12 @@ namespace {
 const char* TUNABLES_PATH = "tunables.json";
 const char* CHARACTER_PATH = "characters/mage.json";
 const char* DATA_DIR = "data";
+const char* SETTINGS_PATH = "settings.json";  // the player's settings (graphics quality); not in the repository
 
 struct Options {
-  std::string levelPath = "levels/abyss.json", shotPath;
+  std::string levelPath = "levels/abyss.json", shotPath, quality;
   int shotFrames = 0;  // > 0: render this many frames in a hidden window, save the last one, quit
-  bool spawnSet = false, touch = false;
+  bool spawnSet = false, touch = false, profile = false;
   Vector2 spawn{};
 };
 
@@ -46,6 +50,8 @@ Options parseArgs(int argc, char** argv) {
     if (a == "--shot" && i + 2 < argc) { o.shotFrames = std::atoi(argv[++i]); o.shotPath = argv[++i]; }
     else if (a == "--spawn" && i + 1 < argc) o.spawnSet = std::sscanf(argv[++i], "%f,%f", &o.spawn.x, &o.spawn.y) == 2;
     else if (a == "--touch") o.touch = true;
+    else if (a == "--profile") o.profile = true;
+    else if (a == "--quality" && i + 1 < argc) o.quality = argv[++i];
     else if (a == "--scale" && i + 1 < argc) platform::setRenderScale(float(std::atof(argv[++i])));
     else o.levelPath = a;
   }
@@ -139,6 +145,13 @@ int main(int argc, char** argv) {
   if (!opt.shotFrames) synth.start();
 
   Renderer renderer;
+  renderer.profiling = opt.profile;
+  {  // graphics quality: --quality, else the saved setting, else Medium on Android and High elsewhere
+    auto fallback = platform::android() ? Renderer::Quality::Medium : Renderer::Quality::High;
+    std::string saved;
+    if (platform::exists(SETTINGS_PATH)) try { saved = Json::parse(readFile(SETTINGS_PATH)).strOr("quality", ""); } catch (const std::exception&) {}
+    renderer.setQuality(Renderer::qualityByName(opt.quality.empty() ? saved : opt.quality, fallback));
+  }
   Scene3D scene3d;
   renderer.load();
   scene3d.load();
@@ -163,7 +176,8 @@ int main(int argc, char** argv) {
     world.reset();
     scene3d.place(world);
   };
-  auto menuItems = [&] {  // what the keyboard's F-keys do, for touch screens and gamepads
+  std::function<std::vector<MenuItem>()> menuItems;  // a std::function: the Graphics entry rebuilds the menu
+  menuItems = [&] {  // what the keyboard's F-keys do, for touch screens and gamepads
     std::vector<MenuItem> items{{"Resume", nullptr}, {"Restart", [&] { world.reset(); }}};
     for (const std::string& f : platform::listFiles("levels", ".json")) {
       std::string path = "levels/" + f, name = f;
@@ -173,6 +187,14 @@ int main(int argc, char** argv) {
     items.push_back({"Tune pages", [&] { openPage(0); }});
     items.push_back({"Help", [&] { help = true; }});
     items.push_back({synth.isMuted() ? "Sound: off" : "Sound: on", [&] { synth.toggleMute(); }});
+    items.push_back({std::string("Graphics: ") + Renderer::qualityName(renderer.quality()), [&] {
+      auto q = renderer.quality() == Renderer::Quality::Low ? Renderer::Quality::Medium
+               : renderer.quality() == Renderer::Quality::Medium ? Renderer::Quality::High : Renderer::Quality::Low;
+      renderer.setQuality(q);
+      platform::writeText(SETTINGS_PATH, std::string("{ \"quality\": \"") + Renderer::qualityName(q) + "\" }\n");
+      menu.show(menuItems());  // stay in the menu, showing the new setting
+    }});
+    items.push_back({renderer.profiling ? "Timings: on" : "Timings: off", [&] { renderer.profiling = !renderer.profiling; renderer.profiled = 0; }});
     items.push_back({"Quit", [&] { quit = true; }});
     return items;
   };
@@ -185,6 +207,7 @@ int main(int argc, char** argv) {
     touch.update(showTouch && !paused ? TouchControls::read(ui) : std::vector<Touch>{}, ui.VW, ui.VH);
     input.poll(showTouch && !paused ? &touch : nullptr);
     if (IsKeyPressed(KEY_M)) synth.toggleMute();
+    if (IsKeyPressed(KEY_F3)) { renderer.profiling = !renderer.profiling; renderer.profiled = 0; }
     if (IsKeyPressed(KEY_F1)) help = !help;
     else if (help && touchMode && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) help = false;  // a tap closes it
     bool menuKey = IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_BACK) || touch.menuTapped() ||
@@ -224,8 +247,10 @@ int main(int argc, char** argv) {
     }
     if (opt.shotFrames) world.banner.t = 0;
     if (page < 0 && !menu.open) {  // menus and tune pages pause the game
+      double t0 = GetTime();
       world.update(dt, input);
       scene3d.update(dt, world);
+      if (renderer.profiling) renderer.addSim((GetTime() - t0) * 1000);
     }
     renderer.draw(world, scene3d, [&] {
       if (showTouch && page < 0 && !menu.open) touch.draw(ui);
@@ -234,6 +259,11 @@ int main(int argc, char** argv) {
       if (help) renderer.drawHelp(touchMode);
     });
     if (opt.shotFrames && frame + 1 >= opt.shotFrames) {
+      if (opt.profile) {
+        const auto& a = renderer.avg;
+        std::printf("profile %dx%d: 3D %.2f  world %.2f  post+HUD %.2f  present %.2f  sim %.2f  ms\n", renderer.ui.RW, renderer.ui.RH,
+                    a.scene3d, a.world, a.post, a.present, a.sim);
+      }
       renderer.screenshot(opt.shotPath);
       break;
     }
