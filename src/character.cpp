@@ -79,7 +79,11 @@ Character parseCharacter(const std::string& path) {
   c.anchorX = float(anchor->arr[0].num); c.anchorY = float(anchor->arr[1].num);
   for (auto& [name, a] : anims->obj) {
     SheetAnim s{int(a.numOr("row", 0)), int(a.numOr("frames", 1)), {}};
-    if (auto h = a.get("head")) for (auto& p : h->arr) s.head.push_back({float(p.arr[0].num), float(p.arr[1].num)});
+    if (auto h = a.get("head"))
+      for (auto& p : h->arr) {
+        if (p.arr.size() < 2) fail(atlasPath + ": anim " + name + ": each head entry needs [x, y]");
+        s.head.push_back({float(p.arr[0].num), float(p.arr[1].num)});
+      }
     s.head.resize(s.frames, s.head.empty() ? Vector2{0, -c.anchorY} : s.head.back());
     c.anims[name] = s;
   }

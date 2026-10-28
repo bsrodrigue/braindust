@@ -6,6 +6,8 @@ Living document. Updated as prototypes change. Last update: 2026-10-28.
 
 A 2D action-exploration game about a black mage whose magic lives in his cranium. Spending magic beyond your means costs blood, and blood-casting turns the brain into stardust. Set in an ocean of thalassophobia and cosmic horror: giant skulls on the seafloor, universes inside their cracks, things that escaped from minds.
 
+**World:** a set of **areas**, each its own **biome** (see 7b). The sea is the first; a lake of blood and, late in the game, a crocodile swamp follow.
+
 **Core feeling:** dread and temptation. Power is always available, but it is paid for with your body and your mind.
 
 **Pillars** (from the design theory notes):
@@ -32,6 +34,7 @@ A 2D action-exploration game about a black mage whose magic lives in his cranium
 - Film grain, heavy vignette, near-black at depth.
 - Palette (abyss): void `#010204`, ink `#b9c2c4`, tarnished brass `#8f7448`, mana `#7a98a8`, blood `#8e1f2b`, stardust `#8c7aa8`.
 - Reference: `docs/Gemini_Generated_Image_bzuxnnbzuxnnbzux.jpeg` (tiny diver, giant cracked skull with a galaxy inside, bone field).
+- Each biome has its own palette and references (7b); this palette is the sea's. Concept art in `docs/` and `docs/Concept-Arts/` is inspiration, not canon.
 
 ## 3b. Tileset (land)
 
@@ -159,6 +162,72 @@ Types live in `data/enemies.json` (F2 → Enemies): a `behaviour` (`stalker` or 
 | **Escaped thought** | Pocket universe | Pale flesh mass with several eyes and tendrils; chases within 320 px. Lore: a creature that escaped from a cranium. |
 | **Leviathan** | 3D background (not hittable) | 48-segment eel body with spines and needle teeth. Far passes behind you at depth > 120 m; every third pass at depth > 180 m it slides **between the camera and you**, lit only by your light, with a pale eye. Groans on each pass. |
 
+## 7b. World: areas and biomes
+
+The game is a set of **areas**. Each area is a **biome**: its own ground and liquid, palette and light, creatures, hazards, sound, lore, and **one twist on the core mechanic** (mana → blood → stardust). Levels are built inside an area; an area can hold several levels.
+
+### What a biome defines
+| Part | Examples |
+|---|---|
+| Palette and sky | sea: teal to purple-black, sunset sky above; blood lake: purple storm sky over red water |
+| Liquid and its rules | sea water (swim, sink, pressure); swamp water (shallow, wading); blood (see Lake of Blood) |
+| Terrain | tile family for land, rock style for walls, props (huts, logs, corpses) |
+| Background | 3D decor (skulls, tower) or painted layers; fog colour and density |
+| Creatures | the enemy roster of `data/enemies.json` that lives there, and its boss |
+| Hazards | dust zones, pressure, spawners, liquids that hurt |
+| Twist on the core mechanic | what blood, mana or stardust means here |
+| Sound | drone colour, creature voices, ambience |
+| Fear | each biome has its own phobia, as the sea has thalassophobia |
+| Lore | who lived or died here, and why the place is the way it is |
+
+### Areas
+| Area | Biome | Levels | Status |
+|---|---|---|---|
+| The Shore of Kingdoms | Sunset coast: villages, rooftops, the monks' tower, the pier | `levels/shore.json` | Built |
+| The Sea | Deep ocean: darkness, pressure, giant infant skulls, lurkers, leviathans | `levels/abyss.json`, `levels/corpses.json` | Built |
+| Inside the crack | A dreaming cosmos: low gravity, galaxy backdrop, escaped thoughts | Fixed pocket room | Built (one room) |
+| The Lake of Crocos | Crocodile swamp: mist, black-green water, mound huts and stepped temples; horrifying, hostile crocos | — | Concept, **late game** |
+| The Lake of Blood | A river of blood in a dry savanna, choked with corpses and a mosquito swarm | — | Concept |
+
+### The Lake of Crocos (concept, late game)
+A late-game area: the player arrives with the full moveset, and the crocos are among the hardest enemies.
+
+Art: `docs/Concept-Arts/CrocoMage.jpeg`, `CrocoMage2.jpeg`, `CrocoMage3.jpeg`, `LakeOfCrocos.jpeg`.
+- **Look:** purple-to-amber dusk, low mist on still black-green water, algae and drowned logs, dead trees hung with moss, rock arches and spires. Mound huts of earth and grass; stepped temples behind them.
+- **The crocos:** horrifying, hostile creatures, not people to meet. The art shows them living like a tribe (mound huts, temples, a throne): warriors with spears, round shields, bone and leather armour; plain crocodiles basking and lurking in the shallows.
+- **The Croco Mage:** a powerful mage, but **not necessarily smarter than a human mage**: the skulls' power swelled his cranium, not his mind. His cranium has swollen far beyond any wrapper: veined, translucent, one blind white eye. The three CrocoMage images show the skull growing: **the stardust mechanic, on someone else.** In `LakeOfCrocos.jpeg` he sits enthroned, old and robed, with a staff hung with glowing vials, books and a scroll at his feet.
+- **Lore (open):** how the Croco Mage found the power of the skulls and got high on it, to the point of such a cranium. Still to be found.
+- **Fear:** what waits under shallow, murky water.
+- **Gameplay ideas (proposals):**
+  - Shallow water you wade through: slower, no swimming, and you cannot see what is under it. Crocodiles wait there.
+  - Shield warriors that block the wand from the front; the charged thrust breaks the guard. This needs a resistance that depends on which way the enemy faces.
+  - Mosquitoes in the reeds, kin to the Lake of Blood's swarm.
+- **Twist on the core mechanic:** open.
+- **Open questions:** the Croco Mage's origin (above). Is he the area's boss, fought in stages as his skull swells?
+
+### The Lake of Blood (concept)
+Art: `docs/Concept-Arts/LakeOfBlood.jpeg` to `LakeOfBlood4.jpeg` (escalating: the swarm, then eggs and larvae, then human faces, then the brood mother).
+- **Look:** a winding river of blood through a dry savanna under a purple storm sky; red acacias, rock spires, distant mountains. Corpses and skeletons half-sunk everywhere.
+- **Creatures:**
+  - **Mosquitoes:** giant, spined. Later ones have skull-like or human faces, and their abdomens swell red with blood they drank.
+  - **Egg clusters:** dark pods in the blood.
+  - **Larvae:** pale grubs crawling over the corpses, some with faces.
+  - **The brood mother:** a bloated grub with about ten eyes, spindly legs and vestigial wings. The area's boss.
+- **Fear:** the swarm; insects that drink you.
+- **Gameplay ideas (proposals):**
+  - Mosquito: a flying chaser (the first flying enemy above land) that senses **blood**: it notices you while you bleed or just after you blood-cast. Its bite drains HP and heals it, and its abdomen visibly swells.
+  - Egg clusters: destructible spawners that release larvae on a timer, so you choose between pushing on and clearing them.
+  - Larvae: slow ground crawlers (the first enemies that walk).
+  - The brood mother: a boss fight in the blood.
+- **Twist on the core mechanic (proposal):** the lake is blood you did not pay. Spells cast while standing in it take their blood price from the lake instead of from you, but blood in the water draws the swarm.
+- **Open question:** whose blood is it? A battle, a massacre of blood-casters, or something the mosquitoes carried here? The human faces suggest the swarm carries what it drank.
+
+### What the engine needs for biomes (proposal)
+- **Today:** a level sets its fog `palette`, `props`, 3D `decor` and per-solid `tile` style; the sky (sunset), the liquid (sea water with fixed rules), the tileset (Craftpix World Tree Roots) and the drone are the same everywhere.
+- **Needed:** a level names its biome, and `data/biomes.json` defines each one: sky colours, liquid (colour and rules: swim, wade, blood), tile family, background, drone and ambience, and the creature roster. Like moves and enemies, it is data, edited on the F2 pages.
+- **Enemies:** flying (not held under the surface), walking (gravity on land), spawners, bosses, a new `blood` sense, and resistance that depends on facing.
+- **Art:** the concept art sets mood and colour. Creatures in game need **side-view sprite sheets** (consistent frames on a plain background, as the player's sheet), or a procedural drawing first, as the jelly and the leech have.
+
 ## 8. Level: the Abyss (prototype)
 
 - Vertical shaft, 520 m deep (10 px = 1 m), jagged walls and ledges, surface light fading by ~90 m.
@@ -191,6 +260,7 @@ Types live in `data/enemies.json` (F2 → Enemies): a `behaviour` (`stalker` or 
 - Some creatures were created by minds and escaped from craniums.
 - Some places exploded the skulls of the mages who imagined them.
 - Mages are a minority: tribes and kingdoms have their own business and wars.
+- Mages are not only human: the Croco Mage of the swamp (7b) found the power of the skulls and got high on it, until his cranium swelled past saving. He is powerful, but not necessarily smarter than a human mage. How he found that power is still open.
 
 ## 11. Planned / backlog
 
@@ -200,7 +270,9 @@ Types live in `data/enemies.json` (F2 → Enemies): a `behaviour` (`stalker` or 
 - [ ] **Giant skull dungeon** (playable).
 - [x] Spells as traversal: the star leap. Still open: blink, levitate, wall-break.
 - [x] Stardust drug, the consumer side: dust vials. Still open: harvesting dust from mages, predator mages.
-- [ ] Decide whether tribes and kingdoms are met as people (quests, factions) or stay background.
+- [ ] Decide whether tribes and kingdoms are met as people (quests, factions) or stay background. (The crocos are not people: hostile creatures, 7b.)
+- [ ] **Areas and biomes** (7b): `data/biomes.json` and a `biome` per level; the Lake of Blood with the mosquito, egg clusters, larvae and the brood mother; the Lake of Crocos, late game.
+- [ ] Lore: how the Croco Mage found the power of the skulls.
 - [ ] Sound pass: authored ambience, creature voices.
 
 ## 12. Assets
@@ -273,6 +345,13 @@ Lower path: crates to hop, a fire and a villager.
 
 
 ## 13. Changelog
+
+- **2026-10-28** Fixes: seam lines between tiles (textures now clamp instead of repeat at their edges); light holes and inscriptions no longer jitter against the world during screen shake; fonts no longer leak on every window resize; the far leviathan no longer hangs frozen during the near one's passes; a leech's bite can be the stardust that kills you, with its own message; malformed atlases and `\u` escapes fail cleanly; the editor opens levels without `lurkers`.
+
+- **2026-10-28** The Lake of Crocos is a late-game area of horrifying, hostile crocos; the Croco Mage is powerful but no smarter than a human mage, and his origin is open.
+- **2026-10-28** World structure: areas, each its own biome (7b). Two new areas from the concept art in `docs/Concept-Arts/`: the Lake of Crocos and the Lake of Blood.
+
+- **2026-10-28** Land tiles: the grass top-left and top-right corners were swapped (a notch of sky at every step); the last column of a solid is now flush with its right edge, so the rocky rim shows when the width is not a multiple of 64; bridges use only the plank that tiles (the narrow piece left gaps); one-tile-wide pieces get both end caps; grass stays under crates and stones, and is replaced by dirt only where higher ground actually rises from it.
 
 - **2026-10-28** Moves, enemies and items are data (`data/moves.json`, `enemies.json`, `items.json`), edited on new F2 pages (Tune → Moves → Enemies → Items) and saved back. New moves: charged thrust, dodge, parry, star leap. Per-spell blood rate, now 1.2 (blood used to be cheaper than mana, and with focus a profit). Damage types and per-enemy resistances (immune, absorb, weak), shown by glance, heal and gold bursts. New enemies: jelly (light), isopod (noise, shelled), leech (stardust). Dust vials (mana for stardust). Stardust seals and hidden pickups. Levels: content placed; a sealed alcove in The Sleeping Generation; a ledge on the Shore only the star leap reaches. Fixed: two wrappers in The Sleeping Generation were out of reach since the player's hitbox grew (mana, protection). Tests: `tests/gameplay_test.cpp`.
 - **2026-10-28** Fixes: bodies no longer pass through rock where solids overlap; a level path relative to your shell works; the tune menu keeps multiplicative wrapper bonuses right. `tests/collision_test.cpp`.

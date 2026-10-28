@@ -8,8 +8,8 @@ uniform sampler2D texFg;
 uniform vec2 uRes;
 uniform vec2 uCam;
 uniform float uS, uTime, uShallow, uDeep, uPocket, uWarp;
-uniform float uWaterY;
-uniform float uDark;  // darkness overlay alpha this frame: lets us tell solid rock (alpha 1) from open water  // screen px from the top where the sea begins; above it is sky and land
+uniform float uWaterY;  // screen px from the top where the sea begins; above it is sky and land
+uniform float uDark;    // darkness overlay alpha this frame: lets us tell solid rock (alpha 1) from open water
 out vec4 finalColor;
 
 vec3 sceneAt(vec2 uv) {

@@ -272,7 +272,7 @@ async function listLevels(selectName) {
 async function openLevel(name) {
   try {
     const res = await fetch('levels/' + encodeURIComponent(name)); if (!res.ok) throw new Error(res.status);
-    L = await res.json(); file = name; sel = null; undo.length = redo.length = 0; dirty = false; frame(); sync(); say(`Opened ${name}`);
+    L = await res.json(); L.solids ??= []; L.lurkers ??= []; file = name;  // both optional for the game sel = null; undo.length = redo.length = 0; dirty = false; frame(); sync(); say(`Opened ${name}`);
   } catch (e) { say(`Could not open ${name}: ${e.message}`, true); }
 }
 async function save() {

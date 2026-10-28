@@ -27,6 +27,7 @@ class Renderer {
   std::vector<Mote> snow_;
   std::vector<Vector3> stars_;
   float darkNow_ = 0;  // darkness overlay alpha this frame (the post shader needs it)
+  Vector2 shake_{};    // this frame's screen shake, world px: it moves the 2D world, not the 3D background
 
   // renderer.cpp
   void worldPass(const World& w, const Scene3D& s);
@@ -34,7 +35,7 @@ class Renderer {
   void lightsPass(const World& w, const Scene3D& s, Camera2D c2);
   void inscriptions(const World& w);
   void composite(const World& w, Panel* panel);
-  Vector2 toScreen(const World& w, float wx, float wy) const;
+  Vector2 toScreen(const World& w, float wx, float wy, bool shaken = true) const;  // shaken: moves with the 2D world's shake
   Vector2 project(const World& w, const Camera3D& c, Vector3 p) const;  // a 3D point to world px
 
   // scenery.cpp
