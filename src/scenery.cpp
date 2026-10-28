@@ -81,38 +81,54 @@ void Renderer::drawLandSolid(const World& w, const Box& s) {
   if (!CheckCollisionRecs(view, r)) return;
   std::string st = tileStyle(s);
   if (st == "box") { tileAt("platformer_wooden_box", s.x, s.y, s.w, s.h, r); return; }
+  // a solid open on both sides but only one tile wide: the left half of the left piece and the right half of the right one
+  auto halves = [&](const char* left, const char* right, float y, float tw, float th, Rectangle clip) {
+    tileAt(left, s.x, y, tw, th, GetCollisionRec(clip, {s.x, clip.y, s.w / 2, clip.height}));
+    tileAt(right, s.x + s.w - tw, y, tw, th, GetCollisionRec(clip, {s.x + s.w / 2, clip.y, s.w / 2, clip.height}));
+  };
   if (st == "float" || st == "bridge") {  // one row, drawn a little thicker than its collider
     bool bridge = st == "bridge";
-    float tw = bridge ? 32 : TILE, th = bridge ? 32 : TILE;
+    float tw = bridge ? 32 : TILE, th = bridge ? 32 : TILE, y = s.y - (bridge ? 6 : 8);
     int n = std::max(1, int(std::ceil(s.w / tw)));
     Rectangle clip{s.x, s.y - 8, s.w, th + 8};
+    if (!bridge && n == 1) { halves("platformer_ground_10", "platformer_ground_12", y, tw, th, clip); return; }
     for (int i = 0; i < n; i++) {
-      const char* nm = bridge ? (i % 2 ? "platformer_bridge_part_02" : "platformer_bridge_part_01")
-                       : n == 1     ? "platformer_ground_11"
-                       : i == 0     ? "platformer_ground_10"
-                       : i == n - 1 ? "platformer_ground_12"
-                                    : "platformer_ground_11";
-      float x = (!bridge && i == n - 1 && n > 1) ? s.x + s.w - tw : s.x + i * tw;  // right cap flush with the edge
-      tileAt(nm, x, s.y - (bridge ? 6 : 8), tw, th, clip);
+      // bridge_part_01 fills its tile and repeats seamlessly; part_02 is a narrow block that would leave gaps
+      const char* nm = bridge ? "platformer_bridge_part_01" : i == 0 ? "platformer_ground_10" : i == n - 1 ? "platformer_ground_12" : "platformer_ground_11";
+      float x = i == n - 1 && n > 1 ? s.x + s.w - tw : s.x + i * tw;  // the last piece flush with the edge
+      tileAt(nm, x, y, tw, th, clip);
     }
     return;
   }
-  // ground and stone: a grid of tiles, only where visible
+  // ground and stone: a grid of tiles, only where visible. Ground pieces by side, [open left, middle, open right]:
+  // ground_04 is the top-left corner (its rim curls down on the left), ground_08 the top-right; 09 and 13 the side edges
+  static const char* const TOP[3] = {"platformer_ground_04", "platformer_ground_02", "platformer_ground_08"};
+  static const char* const BODY[3] = {"platformer_ground_09", "platformer_ground_06", "platformer_ground_13"};
   float T = st == "stone" ? std::min(TILE, s.w) : TILE;
   float vx0 = std::max(s.x, view.x), vy0 = std::max(s.y, view.y), vx1 = std::min(s.x + s.w, view.x + view.width), vy1 = std::min(s.y + s.h, view.y + view.height);
   int c0 = int((vx0 - s.x) / T), c1 = int(std::ceil((vx1 - s.x) / T)), r0 = int((vy0 - s.y) / T), r1 = int(std::ceil((vy1 - s.y) / T));
   int cols = std::max(1, int(std::ceil(s.w / T)));
   for (int ry = r0; ry < r1; ry++)
     for (int cx = c0; cx < c1; cx++) {
-      // where another solid continues the ground, no grass lip or rocky edge: neighbours read as one mass
-      float tx = s.x + cx * T, ty = s.y + ry * T;
-      bool covered = w.solidAt(tx + T / 2, s.y - 2), leftOpen = cx == 0 && !w.solidAt(s.x - 2, ty + T / 2),
-           rightOpen = cx == cols - 1 && !w.solidAt(s.x + s.w + 2, ty + T / 2);
-      const char* nm;
-      if (st == "stone") nm = "platformer_stone";
-      else if (ry == 0 && !covered) nm = leftOpen ? "platformer_ground_08" : rightOpen ? "platformer_ground_04" : "platformer_ground_02";
-      else nm = leftOpen ? "platformer_ground_09" : rightOpen ? "platformer_ground_13" : "platformer_ground_06";
-      tileAt(nm, tx, ty, T, T, r);
+      // the last column sits flush with the right edge, so its rim is not cropped away when the width is not a multiple of T
+      float tx = cx == cols - 1 && cols > 1 ? s.x + s.w - T : s.x + cx * T, ty = s.y + ry * T;
+      if (st == "stone") { tileAt("platformer_stone", tx, ty, T, T, r); continue; }
+      // where another solid continues the ground, no rocky edge: neighbours read as one mass
+      bool leftOpen = cx == 0 && !w.solidAt(s.x - 2, ty + T / 2), rightOpen = cx == cols - 1 && !w.solidAt(s.x + s.w + 2, ty + T / 2);
+      int side = leftOpen ? 0 : rightOpen ? 2 : 1;
+      auto draw = [&](const char* const* set, Rectangle clip) {
+        if (leftOpen && rightOpen) halves(set[0], set[2], ty, T, T, GetCollisionRec(clip, {s.x, ty, s.w, T}));
+        else tileAt(set[side], tx, ty, T, T, clip);
+      };
+      draw(ry == 0 ? TOP : BODY, r);
+      if (ry > 0) continue;
+      // and no grass lip under ground that rises from this one, over exactly the span it covers (crates and stones
+      // sit on the grass)
+      for (auto& o : *w.solids) {
+        if (&o == &s || o.open || o.y >= s.y || o.y + o.h < s.y || tileStyle(o) != "ground") continue;
+        float x0 = std::max({o.x, tx, s.x}), x1 = std::min({o.x + o.w, tx + T, s.x + s.w});
+        if (x1 > x0) draw(BODY, GetCollisionRec(r, {x0, ty, x1 - x0, T}));
+      }
     }
 }
 

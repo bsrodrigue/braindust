@@ -274,6 +274,8 @@ Lower path: crates to hop, a fire and a villager.
 
 ## 13. Changelog
 
+- **2026-10-28** Land tiles: the grass top-left and top-right corners were swapped (a notch of sky at every step); the last column of a solid is now flush with its right edge, so the rocky rim shows when the width is not a multiple of 64; bridges use only the plank that tiles (the narrow piece left gaps); one-tile-wide pieces get both end caps; grass stays under crates and stones, and is replaced by dirt only where higher ground actually rises from it.
+
 - **2026-10-28** Moves, enemies and items are data (`data/moves.json`, `enemies.json`, `items.json`), edited on new F2 pages (Tune → Moves → Enemies → Items) and saved back. New moves: charged thrust, dodge, parry, star leap. Per-spell blood rate, now 1.2 (blood used to be cheaper than mana, and with focus a profit). Damage types and per-enemy resistances (immune, absorb, weak), shown by glance, heal and gold bursts. New enemies: jelly (light), isopod (noise, shelled), leech (stardust). Dust vials (mana for stardust). Stardust seals and hidden pickups. Levels: content placed; a sealed alcove in The Sleeping Generation; a ledge on the Shore only the star leap reaches. Fixed: two wrappers in The Sleeping Generation were out of reach since the player's hitbox grew (mana, protection). Tests: `tests/gameplay_test.cpp`.
 - **2026-10-28** Fixes: bodies no longer pass through rock where solids overlap; a level path relative to your shell works; the tune menu keeps multiplicative wrapper bonuses right. `tests/collision_test.cpp`.
 
