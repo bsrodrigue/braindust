@@ -15,8 +15,13 @@ static std::string stateAfter(const Character& c, const AnimParams& p) {
 int main() {
   SetTraceLogLevel(LOG_WARNING);
   Character c = parseCharacter("characters/mage.json");
-  // priority: strike > flare > cast > (land: rise, fall, run) > drift in water > idle
-  assert(stateAfter(c, {{"strike", .2f}, {"flare", 1}, {"castHold", .3f}}) == "strike");
+  // priority: thrust > parry > dodge > strike > charge > flare > cast > (land: rise, fall, run) > drift in water > idle
+  assert(stateAfter(c, {{"thrust", .1f}, {"parry", .2f}, {"strike", .2f}}) == "thrust");
+  assert(stateAfter(c, {{"parry", .2f}, {"dodge", .1f}, {"strike", .2f}}) == "parry");
+  assert(stateAfter(c, {{"dodge", .1f}, {"strike", .2f}}) == "dodge");
+  assert(stateAfter(c, {{"strike", .2f}, {"charge", .5f}, {"flare", 1}, {"castHold", .3f}}) == "strike");
+  assert(stateAfter(c, {{"charge", .5f}, {"flare", 1}}) == "charge");
+  assert(stateAfter(c, {{"charge", .1f}, {"inWater", 1}}) == "drift");  // a tap is not a charge
   assert(stateAfter(c, {{"flare", 1}, {"castHold", .3f}}) == "flare");
   assert(stateAfter(c, {{"castHold", .3f}, {"inWater", 1}}) == "cast");
   assert(stateAfter(c, {{"vy", -100}}) == "rise");

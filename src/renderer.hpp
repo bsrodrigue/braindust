@@ -51,6 +51,8 @@ class Renderer {
   void drawEnemy(const World& w, const Enemy& e);
   void drawCrack(Rectangle k, Color fill, Color stroke, const Texture2D* galaxy);
   void drawWrapper(const World& w, const Wrapper& wr);
+  void drawItem(const World& w, const Pickup& it);
+  void drawSeal(const World& w, const Box& b);
 
   // hud.cpp
   void drawHud(const World& w);

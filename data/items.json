@@ -1,0 +1,12 @@
+{
+ "dustVial": {
+  "title": "A DUST VIAL",
+  "line": "Stardust from a broken mind. It fills your mana, and takes a little of yours.",
+  "input": "item",
+  "mana": 45,
+  "dust": 6,
+  "heal": 0,
+  "max": 3,
+  "noise": 0.3
+ }
+}

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <string>
 
 #include "rlgl.h"
 #include "util.hpp"
@@ -98,7 +99,8 @@ void Renderer::worldPass(const World& w, const Scene3D& s) {
   }
   BeginMode2D(c2);
   if (w.inPocket) {
-    for (auto& b : *w.solids) { DrawRectangleRec({b.x, b.y, b.w, b.h}, hex("#16121e")); DrawRectangleRec({b.x, b.y, b.w, 1.5f}, hex("#5a4f6a")); }
+    for (auto& b : *w.solids)
+      if (!b.open) { DrawRectangleRec({b.x, b.y, b.w, b.h}, hex("#16121e")); DrawRectangleRec({b.x, b.y, b.w, 1.5f}, hex("#5a4f6a")); }
     drawCrack(pocket::exitCrack, hex("#071a22"), hex("#5d7f8f"), nullptr);
     const Rectangle& a = pocket::altar;
     DrawRectangleRec({a.x, a.y + 24, a.width, a.height - 24}, hex("#5e4c30"));
@@ -127,11 +129,13 @@ void Renderer::worldPass(const World& w, const Scene3D& s) {
       }
     }
     for (auto& b : *w.solids)  // rock under the sea stays dark
-      if (b.y >= 0) { DrawRectangleRec({b.x, b.y, b.w, b.h}, hex("#030506")); DrawRectangleRec({b.x, b.y, b.w, 1.5f}, hex("#152229")); }
+      if (b.y >= 0 && !b.open) { DrawRectangleRec({b.x, b.y, b.w, b.h}, hex("#030506")); DrawRectangleRec({b.x, b.y, b.w, 1.5f}, hex("#152229")); }
     BeginShaderMode(tile_);  // land is tiled
-    for (auto& b : *w.solids) if (b.y < 0) drawLandSolid(w, b);
+    for (auto& b : *w.solids) if (b.y < 0 && !b.open) drawLandSolid(w, b);
     EndShaderMode();
-    for (auto& wr : w.level.wrappers) if (!wr.taken) drawWrapper(w, wr);
+    for (auto& b : *w.solids) if (b.seal > 0 && !b.open) drawSeal(w, b);
+    for (auto& wr : w.level.wrappers) if (!wr.taken && w.seen(wr.x, wr.y, wr.reveal)) drawWrapper(w, wr);
+    for (auto& it : w.level.items) if (!it.taken && w.seen(it.x, it.y, it.reveal)) drawItem(w, it);
   }
   for (auto& e : w.enemies) if (e.alive) drawEnemy(w, e);
   if (w.outcome == Outcome::Playing) drawPlayer(w);
@@ -169,7 +173,8 @@ void Renderer::darknessPass(const World& w, const Scene3D& s) {
     hole(pc.x, pc.y, s.hasDreamer() ? 300 + std::sin(w.t * 1.3f) * 25 : 130);
     for (auto& a : s.crackAnchors()) if (inFront(s.camera, a)) { Vector2 p = project(w, s.camera, a); hole(p.x, p.y, 220); }
     for (auto& l : w.level.lights) hole(l.x, l.y, l.r);
-    for (auto& wr : w.level.wrappers) if (!wr.taken) hole(wr.x, wr.y, 50);
+    for (auto& wr : w.level.wrappers) if (!wr.taken && w.seen(wr.x, wr.y, wr.reveal)) hole(wr.x, wr.y, 50);
+    for (auto& it : w.level.items) if (!it.taken && w.seen(it.x, it.y, it.reveal)) hole(it.x, it.y, 40);
   }
   EndBlendMode();
   EndTextureMode();
@@ -181,7 +186,12 @@ void Renderer::lightsPass(const World& w, const Scene3D& s, Camera2D c2) {
   addBlend();
   BeginMode2D(c2);
   for (auto& e : w.enemies) {
-    if (!e.alive || e.thought || e.mode != EnemyMode::Drift) continue;  // a lure that goes out means it has seen you
+    if (!e.alive) continue;
+    const std::string kind = w.enemyType(e).str("draw", "lurker");
+    float cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+    if (kind == "jelly") glow(cx, cy - 2, 22 + 4 * std::sin(e.ph * 3), hex("#7fd8d0", .35f));
+    if (kind == "leech" && P.dust > 0) glow(cx, cy, 10 + P.dust * .2f, hex("#8c7aa8", std::min(.5f, P.dust / 120)));
+    if (kind != "lurker" || e.mode != EnemyMode::Drift) continue;  // a lure that goes out means it has seen you
     Vector2 l = lurePos(e);
     glow(l.x, l.y, 14, hex("#5fbfa4", .67f));
     DrawRectangleV({l.x - 1, l.y - 1}, {2, 2}, hex("#cfe8df"));
@@ -198,7 +208,10 @@ void Renderer::lightsPass(const World& w, const Scene3D& s, Camera2D c2) {
       if (p.type == "fire") glow(p.x, p.y - 14, 80 + 6 * std::sin(t * 11), hex("#f2a03a", .45f));
       if (p.type == "hut") glow(p.x, p.y - 14, 34, hex("#e0903a", .35f));
     }
-    for (auto& wr : w.level.wrappers) if (!wr.taken) glow(wr.x, wr.y, 30, hex("#c8a868", .25f + .1f * std::sin(t * 2)));
+    for (auto& wr : w.level.wrappers)
+      if (!wr.taken && w.seen(wr.x, wr.y, wr.reveal)) glow(wr.x, wr.y, 30, hex("#c8a868", .25f + .1f * std::sin(t * 2)));
+    for (auto& it : w.level.items)
+      if (!it.taken && w.seen(it.x, it.y, it.reveal)) glow(it.x, it.y, 24, hex("#b89cff", .25f + .1f * std::sin(t * 2.4f)));
     for (auto& L : s.towerLights()) {  // windows of the drowned tower: dim, flickering, some long dead
       if (L.dead || !inFront(s.camera, L.p)) continue;
       Vector2 p = project(w, s.camera, L.p);

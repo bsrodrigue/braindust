@@ -13,9 +13,9 @@ cmake -B build -G Ninja && cmake --build build
 ./build/braindust levels/shore.json    # The Shore of Kingdoms: platforming on land
 ```
 
-Keyboard: arrows/WASD move (run on land, swim in the sea), Space jump / stroke up, ↓ dive, J wand, K star bolt, L flare, F (hold) focus, R restart.
-Gamepad: stick move, A stroke, X wand, Y bolt, B flare, RB focus.
-`F2`/`Tab` opens the tune menu: every gameplay variable, live (keyboard or mouse: click a row, drag a value, wheel scrolls, right-click resets; `S` or the Save button writes `tunables.json`). `F1` help, `M` mute, `F5` reloads the level, the character and `tunables.json`.
+Keyboard: arrows/WASD move (run on land, swim in the sea), Space jump / stroke up (Space again in the air: star leap), ↓ dive, J wand (hold and release: charged thrust), Shift dodge, U parry, Q drink a dust vial, K star bolt, L flare, F (hold) focus, R restart.
+Gamepad: stick move, A jump/stroke, X wand, Y bolt, B flare, RB focus, RT dodge, LB parry, D-pad up vial.
+`F2`/`Tab` opens the tune pages, one after another: **Tune** (`tunables.json`), **Moves**, **Enemies**, **Items** (`data/*.json`). Every number, live, pausing the game (keyboard or mouse: click a row, drag a value, wheel scrolls, right-click resets; `S` or the Save button writes that page's file). `F1` help, `M` mute, `F5` reloads the level, the data, the character and `tunables.json`.
 `--spawn x,y` starts elsewhere; `--shot N file.png` renders N frames in a hidden window and saves the last one.
 
 ## Levels
@@ -41,9 +41,17 @@ Format (10 px = 1 m):
 }
 ```
 
-Optional fields: `top` (negative: land and sky above the sea, y = 0 is the surface), `props [{type: hut|villager|fire|post|boat|sprite, x,y, name (sprite: any assets/tileset image), scale, flip}]`, solid `tile` (`ground|float|bridge|stone|box`), `palette {surface, deep}`, `thoughts [{x,y}]`, `wrappers [{x,y,kind: mana|focus|protection|dust}]`, `dustZones [{x,y,w,h,rate}]`, `lights [{x,y,r,color}]`, `texts [{x,y,text}]`, `decor [{model: skull|giant|tower, x,y (px), z (3D units, negative = behind), scale, rx,ry,rz}]`. Without `decor`, the original Abyss background is used. The editor places the core fields and keeps the optional ones when saving.
+Optional fields: `enemies [{type, x,y}]` (any entry of `data/enemies.json`; `lurkers` and `thoughts [{x,y}]` still work), `items [{kind, x,y, hidden}]` (an entry of `data/items.json`), solid `seal` (stardust % a star bolt needs to open it), `hidden` on items and wrappers (`true`: seen and taken only inside your light; a number: also needs that much stardust), `top` (negative: land and sky above the sea, y = 0 is the surface), `props [{type: hut|villager|fire|post|boat|sprite, x,y, name (sprite: any assets/tileset image), scale, flip}]`, solid `tile` (`ground|float|bridge|stone|box`), `palette {surface, deep}`, `wrappers [{x,y,kind: mana|focus|protection|dust}]`, `dustZones [{x,y,w,h,rate}]`, `lights [{x,y,r,color}]`, `texts [{x,y,text}]`, `decor [{model: skull|giant|tower, x,y (px), z (3D units, negative = behind), scale, rx,ry,rz}]`. Without `decor`, the original Abyss background is used. The editor places the core fields and keeps the optional ones when saving.
 
 `portal` and `emptyCrack` are crack centres; the 3D skulls are placed around them. `height` is the seafloor: the 3D graveyard and the depth gauge use it, so keep a floor wall there.
+
+## Moves, enemies, items (`data/`)
+
+Gameplay content is data: every entry is a set of named numbers and strings, edited live on the F2 pages and saved back by them (nesting one level deep shows as `resist.slash`). Code reads each field by name with a default.
+
+- `data/moves.json`: what the player can do. `input` (`staff bolt flare up dodge parry`), `kind` (`melee projectile burst leap dash parry`), `medium` (`any water land ground air`), `mana` (spells: what mana cannot pay is paid in blood at `bloodRatio` HP per point, and turns to stardust), `damage`, `damageType` (`slash pierce star light`), `cooldown` per `group`, `hold` (fires on release after holding that long: the thrust), `anim`/`animTime` (a countdown the character's state machine reads), `noise` (what listeners hear), plus per-kind fields (`reach`, `manaGain`, `knockback`, `lunge`, `speed`, `life`, `radius`, `light`, `time`, `charges`, `invuln`, `waterScale`, `window`, `stun`).
+- `data/enemies.json`: `behaviour` (`stalker`: drift, stalk, lunge, recover; `chaser`: comes straight at you), `sense` (`light`: `sight` × your light radius, × `flareLure` while a flare burns; `noise`: `sight` × how loud you have been; `dust`: `sight` px per stardust %; `fixed`: `sight` px), `draw` (`lurker thought jelly isopod leech`), `hp`, `w`, `h`, `contactDamage`, `contactDust`, `speed`, the stalker's distances and lunge, `respawn`, and `resist.<damageType>`: a damage multiplier. 0 is immune (a dry glance and spark), below 0 it heals the enemy (up to twice its health), above 1 is a weak spot.
+- `data/items.json`: carried consumables (`max`), used with their `input`: `mana`, `heal`, `dust` (the dust vial is a stardust drug: mana now, mind later), `title`/`line` for the pickup banner.
 
 ## Characters
 
@@ -68,11 +76,11 @@ Optional fields: `top` (negative: land and sky above the sea, y = 0 is the surfa
 - `height`: world px from the feet to the top of the head in the first state's first frame (sets the sprite scale).
 - A state shows `frames` of one `anim` row (default: all). Looping at `fps + fpsGain × fpsParam`, or `drive`n by a countdown param going from `driveLength` to 0 (plays the frames once).
 - Each frame, transitions are tried in order; the first whose `when` conditions all hold wins (`from`: `any` or a state name; staying in the current state counts as a match). Conditions: `param`, `!param`, `param op number` with `> >= < <= == !=`.
-- Params the game sets: `strike`, `castHold` (countdowns, s), `flare`, `inWater`, `ground`, `focusing`, `hurt` (0/1), `vx`, `vy`, `speed` (|vx|), `runRatio` (|vx| / runSpeed). Add more in `World::animatePlayer` (`src/world.cpp`).
+- Params the game sets: each move's `anim` countdown (`strike`, `thrust`, `castHold`, `flare`, `dodge`, `parry`, s), `charge` (s the hold input has been held), `inWater`, `ground`, `focusing`, `hurt` (0/1), `vx`, `vy`, `speed` (|vx|), `runRatio` (|vx| / runSpeed). Add more in `World::animatePlayer` (`src/world.cpp`).
 
 ## Files
 
-- `CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`: the game. `cmake --build build --target character_test && ./build/character_test` checks the mage's state machine.
+- `CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`, `data/`: the game. Tests, run from the project root: `cmake --build build --target character_test collision_test gameplay_test`, then `./build/character_test` (the mage's state machine), `./build/collision_test` (bodies stop at the nearest face where solids overlap; tuning keeps the wrapper bonuses), `./build/gameplay_test` (blood costs, moves, senses, resistances, parry, seals, items, saving data; expected values come from `data/`, so tuning keeps it passing).
 - `characters/*.json`: a character = a sprite sheet + an animation state machine (see below).
 - `levels/`: level files. `editor.html` + `serve.py`: the level editor.
 - `assets/*.blend`: Blender sources; `assets/*.glb`: what the game loads.
