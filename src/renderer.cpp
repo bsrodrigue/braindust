@@ -2,14 +2,23 @@
 
 #include <algorithm>
 #include <cmath>
+#include <initializer_list>
 #include <string>
 
 #include "rlgl.h"
 #include "util.hpp"
 
-extern "C" void glFinish(void);  // OpenGL and OpenGL ES alike; only called while profiling
-
 namespace {
+// Waits until the GPU has finished drawing into these framebuffers (0: the screen). A pixel read can only return once
+// they are complete, and it needs nothing outside raylib (a shared raylib does not export glFinish).
+void waitFor(std::initializer_list<unsigned> fbos) {
+  for (unsigned id : fbos) {
+    if (id) rlEnableFramebuffer(id);
+    MemFree(rlReadScreenPixels(1, 1));
+    if (id) rlDisableFramebuffer();
+  }
+}
+
 void premultBlend() {
   rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA, RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
   BeginBlendMode(BLEND_CUSTOM_SEPARATE);
@@ -81,28 +90,28 @@ Vector2 Renderer::project(const World& w, const Camera3D& c, Vector3 p) const {
 
 void Renderer::draw(const World& w, Scene3D& scene3d, const std::function<void()>& overlay) {
   double t0 = GetTime();
-  auto lap = [&](double& avgMs) {  // the time since the last lap, GPU work included
+  auto lap = [&](double& avgMs, std::initializer_list<unsigned> drawn) {  // the time since the last lap, GPU work included
     if (!profiling) return;
     rlDrawRenderBatchActive();
-    glFinish();
+    waitFor(drawn);
     double t = GetTime(), ms = (t - t0) * 1000;
     avgMs += (ms - avgMs) * (profiled ? .05 : 1);
     t0 = t;
   };
   scene3d.render(w, bg_, fg_);
-  lap(avg.scene3d);
+  lap(avg.scene3d, {bg_.id, fg_.id});
   worldPass(w, scene3d);
-  lap(avg.world);
+  lap(avg.world, {world_.id, dark_.id});
   composite(w, [&] {
     if (overlay) overlay();
     if (profiling) drawTimings();
   });
-  lap(avg.post);
+  lap(avg.post, {final_.id});
   BeginDrawing();
   ClearBackground(BLACK);
   DrawTexturePro(final_.texture, {0, 0, float(ui.RW), -float(ui.RH)}, {0, 0, float(GetScreenWidth()), float(GetScreenHeight())}, {0, 0}, 0, WHITE);
   EndDrawing();
-  lap(avg.present);
+  lap(avg.present, {0});
   if (profiling) profiled++;
 }
 

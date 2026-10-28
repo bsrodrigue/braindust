@@ -18,7 +18,7 @@ Gamepad: stick move, A jump/stroke, X wand, Y bolt, B flare, RB focus, RT dodge,
 `Esc` (or Back / Select) opens the menu: restart, play another level, tune pages, help, sound, graphics quality, timings, quit.
 `F2`/`Tab` opens the tune pages, one after another: **Tune** (`tunables.json`), **Moves**, **Enemies**, **Items** (`data/*.json`). Every number, live, pausing the game (keyboard or mouse: click a row, drag a value, wheel scrolls, right-click resets; `S` or the Save button writes that page's file). `F1` help, `M` mute, `F5` reloads the level, the data, the character and `tunables.json`.
 `--spawn x,y` starts elsewhere; `--shot N file.png` renders N frames in a hidden window and saves the last one; `--touch` shows the on-screen controls (the mouse is a finger); `--scale 0.6` renders at that fraction of the window (weak GPUs); `--quality low|medium|high` overrides the graphics setting; `--profile` with `--shot` prints the average time per pass.
-`F3` (or Timings in the menu) shows per-pass timings: fps, 3D, world, post+HUD, present (includes waiting for the screen), simulation, the render size and the quality. While on, the renderer waits for the GPU after each pass so each pass's time includes its GPU work.
+`F3` (or Timings in the menu) shows per-pass timings: fps, 3D, world, post+HUD, present (includes waiting for the screen), simulation, the render size and the quality. While on, the renderer waits for the GPU after each pass (it reads back a pixel) so each pass's time includes its GPU work.
 
 ## Android
 
