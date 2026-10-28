@@ -27,3 +27,5 @@ target_compile_options(braindust PRIVATE $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -W
 
 add_executable(character_test EXCLUDE_FROM_ALL tests/character_test.cpp src/character.cpp)
 target_link_libraries(character_test PRIVATE raylib)
+add_executable(collision_test EXCLUDE_FROM_ALL tests/collision_test.cpp src/world.cpp src/character.cpp)
+target_link_libraries(collision_test PRIVATE raylib)

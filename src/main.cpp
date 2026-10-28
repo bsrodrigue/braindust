@@ -37,7 +37,10 @@ Options parseArgs(int argc, char** argv) {
     else if (a == "--spawn" && i + 1 < argc) o.spawnSet = std::sscanf(argv[++i], "%f,%f", &o.spawn.x, &o.spawn.y) == 2;
     else o.levelPath = a;
   }
-  if (!o.shotPath.empty() && o.shotPath[0] != '/') o.shotPath = std::string(GetWorkingDirectory()) + "/" + o.shotPath;
+  // findRoot() moves to the project root: keep paths given from here working (a level path may also be relative to the root)
+  std::string here = std::string(GetWorkingDirectory()) + "/";
+  if (!o.shotPath.empty() && o.shotPath[0] != '/') o.shotPath = here + o.shotPath;
+  if (o.levelPath[0] != '/' && FileExists((here + o.levelPath).c_str())) o.levelPath = here + o.levelPath;
   return o;
 }
 
@@ -60,9 +63,8 @@ Panel tunePanel(World& w) {
   p.title = "TUNE";
   for (const TunableField& f : TUNABLE_FIELDS)
     p.params.push_back({f.name, f.group, f.step, Tunables{}.*f.field, [&w, &f] { return w.base.*f.field; }, [&w, &f](float v) {
-                          v = std::max(0.f, v);
-                          w.tun.*f.field += v - w.base.*f.field;
-                          w.base.*f.field = v;
+                          w.base.*f.field = std::max(0.f, v);
+                          w.retune();
                         }});
   p.save = [&w] { return std::string(saveTunables(TUNABLES_PATH, w.base) ? "saved tunables.json" : "save failed"); };
   return p;

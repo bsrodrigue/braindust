@@ -72,7 +72,7 @@ Optional fields: `top` (negative: land and sky above the sea, y = 0 is the surfa
 
 ## Files
 
-- `CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`: the game. `cmake --build build --target character_test && ./build/character_test` checks the mage's state machine.
+- `CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`: the game. `cmake --build build --target character_test && ./build/character_test` checks the mage's state machine; `collision_test` (same way) checks that bodies stop at the nearest face where solids overlap, and that tuning keeps the wrapper bonuses.
 - `characters/*.json`: a character = a sprite sheet + an animation state machine (see below).
 - `levels/`: level files. `editor.html` + `serve.py`: the level editor.
 - `assets/*.blend`: Blender sources; `assets/*.glb`: what the game loads.

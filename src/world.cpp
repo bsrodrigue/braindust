@@ -11,15 +11,18 @@ Box boxOf(const Player& p) { return {p.x, p.y, p.w, p.h}; }
 Box boxOf(const Enemy& e) { return {e.x, e.y, e.w, e.h}; }
 Box boxOf(const Rectangle& r) { return {r.x, r.y, r.width, r.height}; }
 
-// axis-separated collision against the solids; waterOnly keeps the body under the surface
+// axis-separated collision against the solids; waterOnly keeps the body under the surface.
+// The direction of travel is kept apart from the velocity: the first solid hit zeroes the velocity, and where
+// solids overlap the next one must still push the body back the way it came, not through the rock.
 template <class Body> void moveBody(Body& b, const std::vector<Box>& solids, float dt, bool waterOnly) {
   b.ground = false;
-  b.x += b.vx * dt;
-  for (auto& s : solids) if (overlaps(boxOf(b), s)) { b.x = b.vx > 0 ? s.x - b.w : s.x + s.w; b.vx = 0; }
-  b.y += b.vy * dt;
+  float vx = b.vx, vy = b.vy;
+  b.x += vx * dt;
+  for (auto& s : solids) if (overlaps(boxOf(b), s)) { b.x = vx > 0 ? s.x - b.w : s.x + s.w; b.vx = 0; }
+  b.y += vy * dt;
   for (auto& s : solids)
     if (overlaps(boxOf(b), s)) {
-      if (b.vy > 0) { b.y = s.y - b.h; b.ground = true; } else b.y = s.y + s.h;
+      if (vy > 0) { b.y = s.y - b.h; b.ground = true; } else b.y = s.y + s.h;
       b.vy = 0;
     }
   if (waterOnly && b.y < 0) { b.y = 0; b.vy = std::max(0.f, b.vy); }
@@ -29,6 +32,13 @@ Enemy makeEnemy(Vector2 s, bool thought) {
   Enemy e;
   e.thought = thought; e.spawn = s; e.x = s.x; e.y = s.y; e.w = thought ? 28.f : 40.f; e.ph = rnd() * 6;
   return e;
+}
+
+void applyBonus(Tunables& t, const std::string& kind) {  // lore: wrappers protect the cranium and grant bonuses
+  if (kind == "focus") t.focusTime *= .6f;
+  else if (kind == "protection") t.maxHp += 25;
+  else if (kind == "dust") t.dustPerBlood *= .6f;
+  else t.manaRegen += 3;
 }
 
 }  // namespace
@@ -67,7 +77,8 @@ void World::reset() {
     pocketSolids_ = {{-300, -300, 300, pocket::H + 600}, {pocket::W, -300, 300, pocket::H + 600}, {-300, -300, pocket::W + 600, 300},
                      {-300, pocket::H, pocket::W + 600, 300}, {60, 640, 260, 24}, {420, 520, 160, 24}, {650, 600, 180, 24},
                      {880, 450, 160, 24}, {1100, 340, 220, 24}};
-  tun = base;
+  for (auto& w : level.wrappers) w.taken = false;
+  retune();
   enterSea();
   player = Player{};
   player.x = level.spawn.x - player.w / 2; player.y = level.spawn.y; player.hp = tun.maxHp; player.mana = tun.maxMana * .6f;
@@ -76,7 +87,6 @@ void World::reset() {
   cracks[0] = {{level.portal.x - 30, level.portal.y - 40, 60, 80}, true, false};
   cracks[1] = {{level.empty.x - 15, level.empty.y - 24, 30, 48}, false, false};
   portalSeen = false;
-  for (auto& w : level.wrappers) w.taken = false;
   for (auto& x : level.texts) x.read = false;
   cam = {player.x - view.x / 2, player.y - view.y * .33f};
   say(level.name == "The Abyss" ? "THE ABYSS" : level.name, "your mind is the only lamp down here");
@@ -134,11 +144,17 @@ void World::hurt(float d, float dir) {
   if (P.hp <= 0) die("Something in the dark took you.");
 }
 
-const char* World::wrapperBonus(const Wrapper& w) {  // lore: wrappers protect the cranium and grant bonuses
-  if (w.kind == "focus") { tun.focusTime *= .6f; return "Focus: you mend faster"; }
-  if (w.kind == "protection") { tun.maxHp += 25; player.hp += 25; return "Protection: your body holds more"; }
-  if (w.kind == "dust") { tun.dustPerBlood *= .6f; return "Status: the dust takes longer to claim you"; }
-  tun.manaRegen += 3; return "Mana: the wrapper drinks from the sea for you";
+void World::retune() {
+  tun = base;
+  for (auto& w : level.wrappers) if (w.taken) applyBonus(tun, w.kind);
+}
+
+const char* World::wrapperBonus(const Wrapper& w) {
+  retune();
+  if (w.kind == "focus") return "Focus: you mend faster";
+  if (w.kind == "protection") { player.hp += 25; return "Protection: your body holds more"; }
+  if (w.kind == "dust") return "Status: the dust takes longer to claim you";
+  return "Mana: the wrapper drinks from the sea for you";
 }
 
 // ---------------------------------------------------------------- update

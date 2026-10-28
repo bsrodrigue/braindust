@@ -72,6 +72,7 @@ class World {
 
   void reset();
   void update(float dt, const Input& in);
+  void retune();  // tun = base plus the bonuses of the wrappers taken this run; call after changing base
 
   void say(std::string title, std::string line);
   void burst(float x, float y, int n, Color c, float speed, float g = 0, float life = .6f);
@@ -105,5 +106,5 @@ class World {
   void pay(float cost);
   void damage(Enemy& e, float d, float dir);
   void hurt(float d, float dir);
-  const char* wrapperBonus(const Wrapper& w);
+  const char* wrapperBonus(const Wrapper& w);  // the wrapper must already be taken
 };
