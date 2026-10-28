@@ -5,3 +5,9 @@ assets/_preview/
 assets/craftpix-net-*.zip
 .cache/
 compile_commands.json
+# Android (android/): Gradle and CMake output, the local SDK path
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties

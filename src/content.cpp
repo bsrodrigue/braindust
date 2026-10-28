@@ -57,7 +57,7 @@ bool saveRecords(const RecordSet& s) {
     }
   }
   std::string out = j.dump() + "\n";
-  return SaveFileText(s.path.c_str(), out.data());
+  return platform::writeText(s.path, out);
 }
 
 Content loadContent(const std::string& dir) {

@@ -61,12 +61,20 @@ void Renderer::drawHud(const World& w) {
   if (w.fade > 0) DrawRectangle(0, 0, ui.RW, ui.RH, hex("#968caa", w.fade));
 }
 
-void Renderer::drawHelp() {
+void Renderer::drawHelp(bool touch) {
   DrawRectangle(0, 0, ui.RW, ui.RH, hex("#000000", .7f));
+  if (touch) {
+    const char* lines[] = {"Left thumb: move (push down to dive)      JUMP: jump / stroke up, again in the air: star leap",
+                           "WAND (hold and let go: thrust)   BOLT   FLARE   DODGE   PARRY   FOCUS (hold)   VIAL",
+                           "Spells you cannot afford drink blood.      The button at the top right pauses.",
+                           "Tap to close"};
+    for (int i = 0; i < 4; i++) ui.text(lines[i], ui.VW / 2, ui.VH * .36f + i * 20, 12, hex("#b9c2c4"), false, true);
+    return;
+  }
   const char* lines[] = {"Arrows / WASD  move      Space  jump / stroke up (in the air: star leap)      Down  dive",
                          "J  wand (+mana; hold and release: thrust)      Shift  dodge      U  parry      Q  dust vial",
                          "K  star bolt      L  flare      F (hold)  focus      spells you cannot afford drink blood",
-                         "R  restart   M  mute   F2  tune pages   F5  reload level, data, character + tunables   F1  this help",
+                         "Esc  menu   R  restart   M  mute   F2  tune pages   F5  reload level, data, character + tunables   F1  help",
                          "Gamepad: stick move, A jump, X wand, Y bolt, B flare, RB focus, RT dodge, LB parry, D-pad up vial"};
   for (int i = 0; i < 5; i++) ui.text(lines[i], ui.VW / 2, ui.VH * .36f + i * 20, 12, hex("#b9c2c4"), false, true);
 }

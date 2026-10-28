@@ -13,15 +13,21 @@ std::string firstFile(std::initializer_list<const char*> paths) {
 }
 }  // namespace
 
+// system fonts on the desktop, else the ones shipped in assets/fonts (always, on Android: raylib reads only the APK there)
 void Ui::loadFonts() {
-  monoPath_ = firstFile({"/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf", "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
-                         "/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf", "C:/Windows/Fonts/consola.ttf"});
-  serifPath_ = firstFile({"/usr/share/fonts/google-noto-vf/NotoSerif[wght].ttf", "/usr/share/fonts/liberation-serif-fonts/LiberationSerif-Regular.ttf",
-                          "/usr/share/fonts/TTF/DejaVuSerif.ttf", "C:/Windows/Fonts/georgia.ttf"});
+  if (!platform::android()) {
+    monoPath_ = firstFile({"/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf", "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+                           "/usr/share/fonts/liberation-mono-fonts/LiberationMono-Regular.ttf", "C:/Windows/Fonts/consola.ttf"});
+    serifPath_ = firstFile({"/usr/share/fonts/google-noto-vf/NotoSerif[wght].ttf", "/usr/share/fonts/liberation-serif-fonts/LiberationSerif-Regular.ttf",
+                            "/usr/share/fonts/TTF/DejaVuSerif.ttf", "C:/Windows/Fonts/georgia.ttf"});
+  }
+  if (monoPath_.empty() && platform::exists("assets/fonts/DejaVuSansMono.ttf")) monoPath_ = "assets/fonts/DejaVuSansMono.ttf";
+  if (serifPath_.empty() && platform::exists("assets/fonts/DejaVuSerif.ttf")) serifPath_ = "assets/fonts/DejaVuSerif.ttf";
 }
 
 bool Ui::resize() {
-  int w = GetScreenWidth(), h = GetScreenHeight();
+  scale = platform::renderScale();
+  int w = std::max(1, int(std::lround(GetScreenWidth() * scale))), h = std::max(1, int(std::lround(GetScreenHeight() * scale)));
   if (w == RW && h == RH) return false;
   RW = w; RH = h;
   // fonts are cached per pixel size, and a new scale means new sizes: drop the old ones or every resize leaks
@@ -56,7 +62,7 @@ void Ui::text(const char* s, float x, float y, float size, Color c, bool serif, 
   DrawTextEx(f, s, at, float(p), 0, c);
 }
 
-Vector2 Ui::mouse() const { return Vector2Scale(GetMousePosition(), 1 / S); }
+Vector2 Ui::mouse() const { return fromScreen(GetMousePosition()); }
 
 Rectangle Ui::px(float x, float y, float w, float h) const {
   return {std::round(x * S), std::round(y * S), std::round(w * S), std::round(h * S)};

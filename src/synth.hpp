@@ -28,6 +28,7 @@ class Synth {
   // drone follows depth: louder and darker the deeper you are
   void drone(float gain, float cutoff) { std::lock_guard l(m); droneGainT = gain; droneCutT = cutoff; }
   void toggleMute() { std::lock_guard l(m); muted = !muted; }
+  bool isMuted() { std::lock_guard l(m); return muted; }
   void groan(bool near) { add({Groan, 0, 6.6f, near ? 58.f : 75.f, near ? 27.f : 40.f, near ? .55f : .16f, near ? 420.f : 170.f}); }
   void thump(float v) {
     add({Thump, 0, .3f, 62, 34, .55f * v});

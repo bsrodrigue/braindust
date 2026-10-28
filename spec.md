@@ -346,6 +346,8 @@ Lower path: crates to hop, a fire and a villager.
 
 ## 13. Changelog
 
+- **2026-10-28** Android: the same code builds for Android (`android/`, Gradle, NativeActivity) with on-screen touch controls (stick, action buttons, menu button) that hide when a gamepad is connected. A pause menu (Esc, Back, Select) replaces the F-keys on touch screens: restart, levels, tune pages (now with Next and drag-to-scroll), help, sound, quit. `src/platform.*`: files from the APK with saves in app storage, GLSL 330 shaders rewritten to GLSL ES 100, render scale (at most 720 px tall on phones; `--scale` on the desktop). Fonts ship in `assets/fonts/`. 3D draws no longer use raylib's default shader (mediump on OpenGL ES let the universe in the giant skull show through its shell); a reversed `smoothstep` in `post.fs` fixed.
+
 - **2026-10-28** Fixes: seam lines between tiles (textures now clamp instead of repeat at their edges); light holes and inscriptions no longer jitter against the world during screen shake; fonts no longer leak on every window resize; the far leviathan no longer hangs frozen during the near one's passes; a leech's bite can be the stardust that kills you, with its own message; malformed atlases and `\u` escapes fail cleanly; the editor opens levels without `lurkers`.
 
 - **2026-10-28** The Lake of Crocos is a late-game area of horrifying, hostile crocos; the Croco Mage is powerful but no smarter than a human mage, and his origin is open.

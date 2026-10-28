@@ -14,9 +14,23 @@ cmake -B build -G Ninja && cmake --build build
 ```
 
 Keyboard: arrows/WASD move (run on land, swim in the sea), Space jump / stroke up (Space again in the air: star leap), ↓ dive, J wand (hold and release: charged thrust), Shift dodge, U parry, Q drink a dust vial, K star bolt, L flare, F (hold) focus, R restart.
-Gamepad: stick move, A jump/stroke, X wand, Y bolt, B flare, RB focus, RT dodge, LB parry, D-pad up vial.
+Gamepad: stick move, A jump/stroke, X wand, Y bolt, B flare, RB focus, RT dodge, LB parry, D-pad up vial, Select menu.
+`Esc` (or Back / Select) opens the menu: restart, play another level, tune pages, help, sound, quit.
 `F2`/`Tab` opens the tune pages, one after another: **Tune** (`tunables.json`), **Moves**, **Enemies**, **Items** (`data/*.json`). Every number, live, pausing the game (keyboard or mouse: click a row, drag a value, wheel scrolls, right-click resets; `S` or the Save button writes that page's file). `F1` help, `M` mute, `F5` reloads the level, the data, the character and `tunables.json`.
-`--spawn x,y` starts elsewhere; `--shot N file.png` renders N frames in a hidden window and saves the last one.
+`--spawn x,y` starts elsewhere; `--shot N file.png` renders N frames in a hidden window and saves the last one; `--touch` shows the on-screen controls (the mouse is a finger); `--scale 0.6` renders at that fraction of the window (weak GPUs).
+
+## Android
+
+The same code builds for Android (OpenGL ES 2, landscape, minimum Android 7.0). On a phone, on-screen controls appear: a stick under the left thumb (push down to dive), JUMP, WAND (hold and let go: thrust), BOLT, FLARE, DODGE, PARRY, FOCUS (hold), VIAL, and a menu button at the top right (Back does the same). Connect a gamepad and they hide; it plays as on the desktop.
+
+Build it with Android Studio: open the `android/` folder and press Run. Or from the command line, with the Android SDK, NDK and CMake installed (Android Studio installs them; set `sdk.dir` in `android/local.properties` or `ANDROID_HOME`):
+
+```sh
+cd android && ./gradlew assembleDebug        # android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+The first build downloads raylib 5.5 and builds it for Android. Gradle copies the game's files into the APK (`levels/`, `data/`, `shaders/`, `characters/`, `assets/` without the Blender sources, `tunables.json`). Saving a tune page on the phone writes into the app's storage, and that copy is read from then on. The game renders at most 720 px tall and scales up (phones have dense screens and the post pass is heavy). Shaders are written in GLSL 330 and rewritten to GLSL ES 100 on load (`src/platform.cpp`); `--scale` and a desktop build of raylib with `-DOPENGL_VERSION="ES 2.0"` reproduce the phone's rendering path on a PC.
 
 ## Levels
 
@@ -80,7 +94,9 @@ Gameplay content is data: every entry is a set of named numbers and strings, edi
 
 ## Files
 
-- `CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`, `data/`: the game. Tests, run from the project root: `cmake --build build --target character_test collision_test gameplay_test`, then `./build/character_test` (the mage's state machine), `./build/collision_test` (bodies stop at the nearest face where solids overlap; tuning keeps the wrapper bonuses), `./build/gameplay_test` (blood costs, moves, senses, resistances, parry, seals, items, saving data; expected values come from `data/`, so tuning keeps it passing).
+- `CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`, `data/`: the game. Tests, run from the project root: `cmake --build build --target character_test collision_test gameplay_test platform_test`, then `./build/character_test` (the mage's state machine), `./build/collision_test` (bodies stop at the nearest face where solids overlap; tuning keeps the wrapper bonuses), `./build/gameplay_test` (blood costs, moves, senses, resistances, parry, seals, items, saving data; expected values come from `data/`, so tuning keeps it passing), `./build/platform_test` (touch controls, the GLSL ES rewrite).
+- `android/`: the Android build (Gradle; NativeActivity, no Java). `src/platform.*`: what differs on Android (files, shaders, render scale); `src/touch.*`: on-screen controls; `src/menu.*`: the pause menu.
+- `assets/fonts/`: DejaVu Sans Mono and DejaVu Serif (license next to them), used where the system has no fonts of its own (Android).
 - `characters/*.json`: a character = a sprite sheet + an animation state machine (see below).
 - `levels/`: level files. `editor.html` + `serve.py`: the level editor.
 - `assets/*.blend`: Blender sources; `assets/*.glb`: what the game loads.

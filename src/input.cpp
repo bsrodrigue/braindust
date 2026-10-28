@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "raylib.h"
+#include "touch.hpp"
 
 Act actByName(const std::string& name) {
   static const char* names[A_COUNT] = {"left", "right", "up", "down", "focus", "staff", "bolt", "flare", "dodge", "parry", "item", "restart"};
@@ -10,7 +11,7 @@ Act actByName(const std::string& name) {
   return A_COUNT;
 }
 
-void Input::poll() {
+void Input::poll(const TouchControls* touch) {
   std::copy(cur_, cur_ + A_COUNT, prev_);
   auto k = [](std::initializer_list<int> keys) { return std::any_of(keys.begin(), keys.end(), [](int key) { return IsKeyDown(key); }); };
   bool pad = IsGamepadAvailable(0);
@@ -28,6 +29,7 @@ void Input::poll() {
   cur_[A_PARRY] = k({KEY_U, KEY_V}) || b(GAMEPAD_BUTTON_LEFT_TRIGGER_1);
   cur_[A_ITEM] = k({KEY_Q, KEY_E}) || b(GAMEPAD_BUTTON_LEFT_FACE_UP);
   cur_[A_RESTART] = k({KEY_R}) || b(GAMEPAD_BUTTON_MIDDLE_RIGHT);
+  if (touch) for (int a = 0; a < A_COUNT; a++) cur_[a] = cur_[a] || touch->held(Act(a));
 }
 
 void Input::feed(std::initializer_list<Act> down) {

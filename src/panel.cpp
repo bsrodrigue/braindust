@@ -33,8 +33,10 @@ Panel::Layout Panel::layout(const Ui& ui) {
   }
   top_ = std::clamp(top_, 0, std::max(0, int(all.size()) - rows));
   for (int i = top_; i < int(all.size()) && i < top_ + rows; i++) L.lines.push_back({all[i].first, all[i].second, L.listTop + (i - top_) * L.rowH});
-  float by = ui.VH - 14 - 22, bw = (L.w - 40) / 3;
-  L.save = {L.x0 + 10, by, bw, 16}; L.defaults = {L.x0 + 20 + bw, by, bw, 16}; L.close = {L.x0 + 30 + 2 * bw, by, bw, 16};
+  int nb = showNext ? 4 : 3;
+  float by = ui.VH - 14 - 22, bw = (L.w - 10 * (nb + 1)) / nb;
+  auto button = [&](int i) { return Rectangle{L.x0 + 10 + i * (bw + 10), by, bw, 16}; };
+  L.save = button(0); L.defaults = button(1); L.next = showNext ? button(2) : Rectangle{}; L.close = button(nb - 1);
   return L;
 }
 
@@ -68,13 +70,21 @@ void Panel::input(const Ui& ui) {
     if (in(L.save)) { if (save) msg_ = save(); }
     else if (in(L.defaults)) { for (int i = 0; i < n; i++) set(i, params[i].def); msg_ = "all values back to defaults (not saved)"; }
     else if (in(L.close)) open = false;
+    else if (showNext && in(L.next)) nextRequested = true;
     else if (hover_ >= 0) {
       sel_ = hover_; follow_ = false;
       const Param& p = params[sel_];
       if (m.x >= minusX && m.x < minusX + BUTTON_W) set(sel_, p.get() - p.step * stepMul());
       else if (m.x >= plusX && m.x < plusX + BUTTON_W) set(sel_, p.get() + p.step * stepMul());
       else if (m.x >= valX) { drag_ = sel_; dragX0_ = m.x; dragV0_ = p.get(); }
+      else { scrolling_ = true; scrollY0_ = m.y; scrollTop0_ = top_; }
+    } else if (m.x >= L.x0 && m.x <= L.x0 + L.w && m.y >= L.listTop && m.y < L.listTop + L.listH) {
+      scrolling_ = true; scrollY0_ = m.y; scrollTop0_ = top_;
     }
+  }
+  if (scrolling_) {  // one row per row height dragged
+    if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) { top_ = scrollTop0_ + int((scrollY0_ - m.y) / L.rowH); follow_ = false; }
+    else scrolling_ = false;
   }
   if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && hover_ >= 0) { sel_ = hover_; set(sel_, params[sel_].def); }
   if (drag_ >= 0) {  // 6 px of drag = one step
@@ -90,7 +100,7 @@ void Panel::draw(Ui& ui) {
   DrawRectangleRec(ui.px(L.x0, y0, L.w, h), hex("#070b0e", .95f));
   DrawRectangleLinesEx(ui.px(L.x0, y0, L.w, h), 1, hex("#8f7448"));
   ui.text(title.c_str(), L.x0 + 10, y0 + 7, 15, hex("#d8b45a"), true);
-  std::string sub = page.empty() ? "game paused" : page + "  ·  F2 next";
+  std::string sub = page.empty() ? "game paused" : page + "  |  F2 next";
   ui.text(sub.c_str(), L.x0 + L.w - 10 - ui.textW(sub.c_str(), 10), y0 + 10, 10, hex("#8a9a9e"));
   float minusX = L.x0 + L.w - MINUS_DX, plusX = L.x0 + L.w - PLUS_DX;
   for (auto& ln : L.lines) {
@@ -110,9 +120,10 @@ void Panel::draw(Ui& ui) {
     const char* vs = TextFormat("%g", v);
     ui.text(vs, plusX - 6 - ui.textW(vs, 12), ln.y, 12, changed ? hex("#f0c060") : hex("#9fd0e0"));
   }
-  const char* help = msg_.empty() ? "click a row, drag the value, wheel scrolls, right-click resets" : msg_.c_str();
+  const char* help = msg_.empty() ? "click a row, drag the value, drag the names to scroll, right-click resets" : msg_.c_str();
   ui.text(help, L.x0 + 10, ui.VH - 14 - 40, 9, msg_.empty() ? hex("#8a9a9e") : hex("#f0c060"));
-  for (auto [r, label] : {std::pair{L.save, "Save"}, {L.defaults, "Defaults"}, {L.close, "Close"}}) {
+  for (auto [r, label] : {std::pair{L.save, "Save"}, {L.defaults, "Defaults"}, {L.next, "Next"}, {L.close, "Close"}}) {
+    if (r.width <= 0) continue;
     bool over = CheckCollisionPointRec(m, r);
     DrawRectangleRec(ui.px(r.x, r.y, r.width, r.height), over ? hex("#4a3c22") : hex("#1a2024"));
     DrawRectangleLinesEx(ui.px(r.x, r.y, r.width, r.height), 1, hex("#8f7448"));
