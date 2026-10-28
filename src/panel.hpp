@@ -1,5 +1,6 @@
 // A side panel of named numbers, edited live with keyboard, mouse or gamepad.
 // The F2 tune menu is one; anything that can list get/set pairs (a platform, a light...) can have its own.
+// The tune pages are four of them (F2 / Tab moves to the next page).
 //   keys: Up/Down select, Left/Right adjust (Shift x10, Ctrl x0.1), Backspace resets, S saves, Esc closes
 //   mouse: click a row, drag the value (6 px per step), -/+ buttons, wheel scrolls, right-click resets
 #pragma once
@@ -18,7 +19,7 @@ struct Param {
 
 class Panel {
  public:
-  std::string title;
+  std::string title, page;  // page: a subtitle (which file it edits)
   std::vector<Param> params;
   std::function<std::string()> save;  // returns the status line to show
   bool open = false;

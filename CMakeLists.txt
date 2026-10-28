@@ -17,7 +17,7 @@ if(NOT raylib_FOUND)
 endif()
 
 add_executable(braindust
-  src/main.cpp src/world.cpp src/character.cpp src/level.cpp src/tunables.cpp src/input.cpp
+  src/main.cpp src/world.cpp src/content.cpp src/character.cpp src/level.cpp src/tunables.cpp src/input.cpp
   src/ui.cpp src/panel.cpp src/scene3d.cpp src/renderer.cpp src/scenery.cpp src/actors.cpp src/hud.cpp)
 target_link_libraries(braindust PRIVATE raylib)
 if(UNIX AND NOT APPLE)
@@ -27,5 +27,7 @@ target_compile_options(braindust PRIVATE $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall -W
 
 add_executable(character_test EXCLUDE_FROM_ALL tests/character_test.cpp src/character.cpp)
 target_link_libraries(character_test PRIVATE raylib)
-add_executable(collision_test EXCLUDE_FROM_ALL tests/collision_test.cpp src/world.cpp src/character.cpp)
+add_executable(collision_test EXCLUDE_FROM_ALL tests/collision_test.cpp src/world.cpp src/content.cpp src/character.cpp src/input.cpp)
 target_link_libraries(collision_test PRIVATE raylib)
+add_executable(gameplay_test EXCLUDE_FROM_ALL tests/gameplay_test.cpp src/world.cpp src/content.cpp src/character.cpp src/input.cpp)
+target_link_libraries(gameplay_test PRIVATE raylib)

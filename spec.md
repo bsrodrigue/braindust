@@ -1,6 +1,6 @@
 # Braindust — Game Specification
 
-Living document. Updated as prototypes change. Last update: 2026-10-26.
+Living document. Updated as prototypes change. Last update: 2026-10-28.
 
 ## 1. Vision
 
@@ -76,7 +76,8 @@ The 3D background, the 3D near-pass layer and the 2D world are composited by one
 ## 5. Core mechanics
 
 ### 5.1 Mana → blood → stardust
-- Spells cost mana. If mana is short, the **missing amount is paid in HP** (`bloodRatio` HP per mana point).
+- Spells cost mana (each its own `mana` in `data/moves.json`). If mana is short, the **missing amount is paid in HP** at the spell's own `bloodRatio` (HP per mana point; 1.2 for all spells: blood costs 20% more than mana).
+- Why above 1: with focus turning mana into HP (33 → 25, 0.76 HP per mana), a `bloodRatio` of 0.6 made blood a profit: 1 mana → 0.76 HP → 1.26 mana of spells. Above 0.76 (1 / 1.32) the round trip loses, so blood is a real sacrifice. The reward has to be worth it: seals, hidden pickups and stronger spells (below).
 - Every mana point paid in blood adds `dustPerBlood` % **stardust**. Stardust is permanent by default (`dustDecay` = 0).
 - Stardust raises spell power: `power = 1 + dust/100 × dustPower`.
 - Stardust raises sight in the dark: `sight = lightBase + dust × dustLight` (+ flare).
@@ -91,53 +92,69 @@ The 3D background, the 3D near-pass layer and the 2D world are composited by one
 
 ### 5.2 Mana sources
 - Passive regen (`manaRegen`/s).
-- Wand melee hits (`manaPerHit`), Hollow Knight "soul" style.
+- Wand melee hits (`manaGain` per enemy hurt), Hollow Knight "soul" style. Nothing for hits that do no damage (an immune enemy is not a mana well).
+- A clean **parry** (`manaGain`).
+- **Dust vials** (`data/items.json`): +45 mana, +6 % stardust. The stardust drug of the lore: mana now, mind later. Carried (max 3), drunk with Q.
+
+### 5.2b Moves (`data/moves.json`, F2 → Moves)
+| Move | Input | What it does |
+|---|---|---|
+| Wand | J (tap) | Melee, `slash`, 10, gives mana on a hit. |
+| Thrust | J held 0.45 s, released | Charged melee, `pierce`, 26, longer reach, lunges forward; a glint and a raised spear show the charge (like Hollow Knight's nail arts). Breaks shells. |
+| Star bolt | K | Spell, 25 mana, `star`, scales with stardust. The only thing that opens seals. |
+| Flare | L | Spell, 35 mana, `light` burst around you and 300 px of light for 2.5 s. |
+| Star leap | Space in the air (land) | Spell, 12 mana: a second jump (+~93 px). Magic as movement: you spend mana all the time, and blood when you overreach. |
+| Dodge | Shift | A 0.18 s dash with 0.25 s of invulnerability; 0.7× in the water. |
+| Parry | U | A 0.2 s window: a touch inside it does no harm, stuns the enemy 1.4 s, hits it back, and gives 22 mana. |
+
+Each move has a `group` cooldown, a `medium` (`any`, `water`, `land`, `ground`, `air`) and a `noise` that listeners hear.
+
+### 5.2c Stardust as a key
+- **Seals** (`seal` on a solid): violet-veined rock with a ring of motes, one per 10 % of stardust it wants, lit for each 10 % you carry. A star bolt opens it only with that much stardust; less glances off ("The seal drinks the bolt. It wants more of your mind."). Paid for with blood, vials, dust zones or pressure.
+- **Hidden pickups** (`hidden` on items and wrappers): seen and taken only inside your light, and with a number, only with that much stardust: a mind far enough gone sees it.
 
 ### 5.3 Focus
 - Hold F, standing still: spend `focusCost` mana over `focusTime` s to heal `focusHeal` HP. Cannot be paid in blood.
 
 ### 5.4 Light and being seen (abyss)
 - Darkness thickens slowly with depth, capped at 68% (reached around 400 m). You see clearly only inside your light; the post pass keeps the deep dark teal, never dead black.
-- Lurkers notice you within `sight × lureSight`. **More light = see more, and be seen from farther.**
-- Flare (L): floods light for `flareTime` s, damages nearby enemies, and makes the distant photophores go dark (something noticed you).
+- Lurkers notice you within `sight` × your light. **More light = see more, and be seen from farther.**
+- Flare (L): floods light for its `time`, damages nearby enemies, and makes the distant photophores go dark (something noticed you).
 
 ### 5.5 Pressure
 - Below `pressureDepth` metres, stardust rises by `pressure` %/s even without casting.
 
-### 5.6 Tunables (current defaults, `tunables.json`)
+### 5.6 Tunables (current defaults, `tunables.json`; moves, enemies and items are in `data/`)
 
 | Variable | Default | Meaning |
 |---|---|---|
 | maxHp / maxMana | 100 / 100 | |
 | manaRegen | 3 | mana/s |
-| manaPerHit | 11 | mana per wand hit |
-| bloodRatio | 0.6 | HP per missing mana point |
 | dustPerBlood | 0.3 | stardust % per mana paid in blood |
 | dustPower | 1.5 | spell damage bonus at 100% dust |
 | dustDecay | 0 | stardust %/s recovered |
 | lightBase | 160 | px of sight with intact brain |
 | dustLight | 2.5 | px of sight per stardust % |
-| flareCost / flareLight / flareTime / flareDmg | 35 / 300 / 2.5 / 15 | |
-| boltCost / boltDmg | 25 / 20 | |
 | focusCost / focusHeal / focusTime | 33 / 25 / 0.9 | |
 | pressureDepth / pressure | 300 m / 0.15 %/s | |
-| lureSight | 1.2 | lurker notice range × your light |
-| lungeSpeed | 520 | lurker strike speed px/s |
-| staffDmg | 10 | |
 | swim / stroke / sink | 200 / 260 / 180 | water movement px/s |
 | runSpeed / groundAccel / airControl | 230 / 18 / 0.35 | land movement |
 | jump / landGravity / fallGravity / maxFall | 780 / 2800 / 4600 / 1150 | land jump arc |
 | jumpCut / coyoteTime / jumpBuffer | 0.45 / 0.08 s / 0.1 s | jump forgiveness |
-| respawn | 10 s | enemy respawn |
 
 ## 6. Controls
 
-←/→ swim · Space stroke up · ↓ dive · J wand · K star bolt · L flare · F (hold) focus · M mute · R restart. Touch pad on phones.
+←/→ move · Space jump / stroke up (in the air: star leap) · ↓ dive · J wand (hold: thrust) · Shift dodge · U parry · Q dust vial · K star bolt · L flare · F (hold) focus · M mute · R restart. Gamepad: A jump, X wand, Y bolt, B flare, RB focus, RT dodge, LB parry, D-pad up vial.
 
 ## 7. Enemies
 
+Types live in `data/enemies.json` (F2 → Enemies): a `behaviour` (`stalker` or `chaser`), a `sense` (what they notice you by), and a damage multiplier per damage type (`resist`: 0 immune with a dry glance, below 0 it feeds on it, above 1 a weak spot with a gold burst). Levels place them with `enemies [{type, x, y}]`.
+
 | Enemy | Where | Behaviour |
 |---|---|---|
+| **Jelly** | Abyss, Sleeping Generation, Shore pool | Chaser, **drawn to light** (2.4 × your light radius, 2.5× more while a flare burns). Glows; trails threads. **Immune to light** (the flare that saves you from lurkers draws them in), weak to the wand. Contact 8. |
+| **Isopod** | Sleeping Generation, Abyss floor, Shore pool | Stalker, **blind: it hears you** (420 px × your recent noise: strokes, jumps, landings, casts, flares, hits). A quiet swimmer passes. **Shelled: the wand glances off**; the thrust pierces (1.5×), bolts 1.25×. Contact 16, lunge 620. |
+| **Leech** | Sleeping Generation (by the dust zones), Abyss | Chaser, **smells stardust** (9 px per %): invisible to an intact mind, drawn to a loosened one. **Feeds on star bolts** (they heal it), weak to light. Its touch pulls 4 % stardust out of your skull. |
 | **Lurker** (anglerfish) | Abyss shaft | Drifts with lure lit → notices you (light-based) → **lure goes dark**, stalks at ~110–160 px, jaw working → **lunges** with jaws wide → recovers. Contact damage 12. |
 | **Escaped thought** | Pocket universe | Pale flesh mass with several eyes and tendrils; chases within 320 px. Lore: a creature that escaped from a cranium. |
 | **Leviathan** | 3D background (not hittable) | 48-segment eel body with spines and needle teeth. Far passes behind you at depth > 120 m; every third pass at depth > 180 m it slides **between the camera and you**, lit only by your light, with a pale eye. Groans on each pass. |
@@ -180,9 +197,9 @@ The 3D background, the 3D near-pass layer and the 2D world are composited by one
 - [ ] **Escaped calamities:** at high stardust, your leaking mind spawns hostile creatures.
 - [ ] **Helmets** as builds: each modifies crack thresholds, light, pressure resistance, blood ratio.
 - [ ] **Skull wands:** each carries a dead mage's signature spell.
-- [ ] **Stardust drug:** harvest dust from mages for temporary power; competes with your own meter; predator mages.
 - [ ] **Giant skull dungeon** (playable).
-- [ ] Spells as traversal (blink, levitate, wall-break) gated by blood cost.
+- [x] Spells as traversal: the star leap. Still open: blink, levitate, wall-break.
+- [x] Stardust drug, the consumer side: dust vials. Still open: harvesting dust from mages, predator mages.
 - [ ] Decide whether tribes and kingdoms are met as people (quests, factions) or stay background.
 - [ ] Sound pass: authored ambience, creature voices.
 
@@ -201,6 +218,7 @@ Previews render to `assets/_preview/` (Workbench), since the Flatpak Blender can
 ## Level: The Sleeping Generation (`levels/corpses.json`)
 
 Second level, inspired by the concept art in `docs/` (the art is inspiration, not canon). 2400 px wide, 420 m deep.
+- **New (2026-10-28):** jellies in the funnel and trench, leeches by the dust zones, isopods on the trench floor; three dust vials (one hidden, 15 % stardust); the mana wrapper's alcove is closed by a 20 % stardust seal (the nearby dust zone can pay for it).
 - **Funnel (0–90 m):** narrow shaft on the left; a rock mass fills the right. First inscription: "They were born dreaming. Nobody woke them."
 - **Trench (90–270 m):** opens under a ceiling of hanging rock teeth into a wide trench of broken bone shelves. Giant infant skulls lie in the 3D background at several depths. Two **dust zones** (places that burst the skull of the mage who imagined them) bend the water and add stardust while you stay inside. A **mana wrapper** hides in an alcove in the left wall; a **dust wrapper** hides under the ceiling teeth on the far right.
 - **The city-skull (270–420 m):** a jagged dome of shell with a gap high on the left, set inside a giant 3D skull whose universe glows through its crack. Tiers inside hold tombs and houses lit by warm lights, a **protection wrapper**, and four **escaped thoughts**. The dreaming portal skull lies on the floor at the centre; the empty crack is outside the dome on the left.
@@ -233,8 +251,9 @@ A land level for testing jumps and platforming, sized to the jump (rise ~110 px,
 4. **The monks' tower:** two walls, open at the bottom for the lower path; ten alternating ledges 95 px apart and 80 px across, ~1000 px of climb. Inscription: "The monks climbed to quiet their minds."
 5. **The ridge** at −115 m: plates with 90 / 100 / 70 px gaps; a ledge one full-height jump (110 px) above holds a **focus wrapper**. A villager looks out; "From here you can see the kingdoms."
 6. **Descent:** stepping stones down to the **pier**; "The ocean gives. The ocean takes."
-7. **The pool:** two lurkers, a mana wrapper, the dreaming portal skull and the empty crack; a giant skull and the drowned tower behind.
+7. **The pool:** two lurkers, a jelly and an isopod, a mana wrapper, the dreaming portal skull and the empty crack; a giant skull and the drowned tower behind.
 Lower path: crates to hop, a fire and a villager.
+8. **Above the focus ledge:** a small ledge 160 px up and to the right holds a dust vial. A jump reaches ~109 px; only the star leap (Space again in the air) gets there.
 
 ## Tooling
 
@@ -254,6 +273,9 @@ Lower path: crates to hop, a fire and a villager.
 
 
 ## 13. Changelog
+
+- **2026-10-28** Moves, enemies and items are data (`data/moves.json`, `enemies.json`, `items.json`), edited on new F2 pages (Tune → Moves → Enemies → Items) and saved back. New moves: charged thrust, dodge, parry, star leap. Per-spell blood rate, now 1.2 (blood used to be cheaper than mana, and with focus a profit). Damage types and per-enemy resistances (immune, absorb, weak), shown by glance, heal and gold bursts. New enemies: jelly (light), isopod (noise, shelled), leech (stardust). Dust vials (mana for stardust). Stardust seals and hidden pickups. Levels: content placed; a sealed alcove in The Sleeping Generation; a ledge on the Shore only the star leap reaches. Fixed: two wrappers in The Sleeping Generation were out of reach since the player's hitbox grew (mana, protection). Tests: `tests/gameplay_test.cpp`.
+- **2026-10-28** Fixes: bodies no longer pass through rock where solids overlap; a level path relative to your shell works; the tune menu keeps multiplicative wrapper bonuses right. `tests/collision_test.cpp`.
 
 - **2026-10-28** Code split from one 1550-line `main.cpp` into modules (world, character, level, tunables, input, ui, panel, scene3d, renderer + scenery/actors/hud). The player's animation is now data: `characters/mage.json` (sheet + state machine, same behaviour as before, checked by `tests/character_test.cpp`). The tune menu is a generic `Panel`, ready for per-object editing. F5 also reloads the character; a failed reload's banner is no longer overwritten by the level title.
 - **2026-10-28** Repo cleanup: the game moved from `port/` to the root (`CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`; build in `build/`). Added `.gitignore` (build output, Blender backups, preview renders, the Craftpix zip).

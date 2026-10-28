@@ -90,7 +90,8 @@ void Panel::draw(Ui& ui) {
   DrawRectangleRec(ui.px(L.x0, y0, L.w, h), hex("#070b0e", .95f));
   DrawRectangleLinesEx(ui.px(L.x0, y0, L.w, h), 1, hex("#8f7448"));
   ui.text(title.c_str(), L.x0 + 10, y0 + 7, 15, hex("#d8b45a"), true);
-  ui.text("game paused", L.x0 + L.w - 10 - ui.textW("game paused", 10), y0 + 10, 10, hex("#8a9a9e"));
+  std::string sub = page.empty() ? "game paused" : page + "  ·  F2 next";
+  ui.text(sub.c_str(), L.x0 + L.w - 10 - ui.textW(sub.c_str(), 10), y0 + 10, 10, hex("#8a9a9e"));
   float minusX = L.x0 + L.w - MINUS_DX, plusX = L.x0 + L.w - PLUS_DX;
   for (auto& ln : L.lines) {
     if (ln.param < 0) { ui.text(ln.header, L.x0 + 10, ln.y + 2, 10, hex("#c8a868")); continue; }

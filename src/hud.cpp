@@ -11,7 +11,7 @@ void Renderer::drawHud(const World& w) {
   const float S = ui.S, VW = ui.VW, VH = ui.VH, t = w.t;
   bool playing = w.outcome == Outcome::Playing;
   float x = 22, y = 22, r = 22, vx = x + r, vy = y + r;
-  bool blood = P.mana < C.boltCost;
+  bool blood = P.mana < w.cheapestSpell();
   DrawCircleV({vx * S, vy * S}, r * S, hex("#030607"));
   float f = P.mana / C.maxMana;  // mana vessel, filled from the bottom
   for (float yy = vy + r - f * 2 * r; yy < vy + r; yy += 1 / S) {
@@ -20,6 +20,14 @@ void Renderer::drawHud(const World& w) {
   }
   DrawRing({vx * S, vy * S}, (r - 1) * S, (r + 1) * S, 0, 360, 48, blood ? hex("#8e1f2b", .6f + .4f * std::sin(t * 6)) : hex("#5e4c30"));
   if (P.focus > 0) DrawRing({vx * S, vy * S}, (r + 3) * S, (r + 5) * S, -90, -90 + 360 * P.focus / C.focusTime, 48, hex("#7a98a8"));
+  // carried items: one flask per item, under the vessel
+  for (size_t i = 0, n = 0; i < P.items.size(); i++)
+    for (int k = 0; k < P.items[i]; k++, n++) {
+      float ix = x + 4 + n * 11, iy = y + 2 * r + 8;
+      DrawRectangleRounded(ui.px(ix, iy, 8, 10), .5f, 4, hex("#1c1822"));
+      DrawRectangleRoundedLines(ui.px(ix, iy, 8, 10), .5f, 4, hex("#b89cff", .8f));
+      DrawRectangleV({(ix + 2) * S, (iy - 2) * S}, {4 * S, 2 * S}, hex("#8f7448"));
+    }
   float bx = vx + r + 12, bw = 170;
   DrawRectangleV({bx * S, (y + 6) * S}, {bw * S, 8 * S}, hex("#100506"));
   DrawRectangleV({bx * S, (y + 6) * S}, {bw * S * std::max(0.f, P.hp) / C.maxHp, 8 * S}, P.bleed > 0 ? hex("#b8323f") : hex("#6e1a22"));
@@ -55,8 +63,10 @@ void Renderer::drawHud(const World& w) {
 
 void Renderer::drawHelp() {
   DrawRectangle(0, 0, ui.RW, ui.RH, hex("#000000", .7f));
-  const char* lines[] = {"Arrows / WASD  swim      Space  stroke up      Down  dive", "J  wand (+mana)      K  star bolt      L  flare      F (hold)  focus",
-                         "R  restart   M  mute   F2  tune menu   F5  reload level, character + tunables   F1  this help",
-                         "Gamepad: stick move, A stroke, X wand, Y bolt, B flare, RB focus"};
-  for (int i = 0; i < 4; i++) ui.text(lines[i], ui.VW / 2, ui.VH * .4f + i * 20, 12, hex("#b9c2c4"), false, true);
+  const char* lines[] = {"Arrows / WASD  move      Space  jump / stroke up (in the air: star leap)      Down  dive",
+                         "J  wand (+mana; hold and release: thrust)      Shift  dodge      U  parry      Q  dust vial",
+                         "K  star bolt      L  flare      F (hold)  focus      spells you cannot afford drink blood",
+                         "R  restart   M  mute   F2  tune pages   F5  reload level, data, character + tunables   F1  this help",
+                         "Gamepad: stick move, A jump, X wand, Y bolt, B flare, RB focus, RT dodge, LB parry, D-pad up vial"};
+  for (int i = 0; i < 5; i++) ui.text(lines[i], ui.VW / 2, ui.VH * .36f + i * 20, 12, hex("#b9c2c4"), false, true);
 }

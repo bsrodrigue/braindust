@@ -1,9 +1,14 @@
 #include "input.hpp"
 
 #include <algorithm>
-#include <initializer_list>
 
 #include "raylib.h"
+
+Act actByName(const std::string& name) {
+  static const char* names[A_COUNT] = {"left", "right", "up", "down", "focus", "staff", "bolt", "flare", "dodge", "parry", "item", "restart"};
+  for (int a = 0; a < A_COUNT; a++) if (name == names[a]) return Act(a);
+  return A_COUNT;
+}
 
 void Input::poll() {
   std::copy(cur_, cur_ + A_COUNT, prev_);
@@ -19,5 +24,14 @@ void Input::poll() {
   cur_[A_STAFF] = k({KEY_J, KEY_Z}) || b(GAMEPAD_BUTTON_RIGHT_FACE_LEFT);
   cur_[A_BOLT] = k({KEY_K, KEY_X}) || b(GAMEPAD_BUTTON_RIGHT_FACE_UP);
   cur_[A_FLARE] = k({KEY_L, KEY_C}) || b(GAMEPAD_BUTTON_RIGHT_FACE_RIGHT);
+  cur_[A_DODGE] = k({KEY_LEFT_SHIFT, KEY_RIGHT_SHIFT, KEY_SEMICOLON}) || b(GAMEPAD_BUTTON_RIGHT_TRIGGER_2);
+  cur_[A_PARRY] = k({KEY_U, KEY_V}) || b(GAMEPAD_BUTTON_LEFT_TRIGGER_1);
+  cur_[A_ITEM] = k({KEY_Q, KEY_E}) || b(GAMEPAD_BUTTON_LEFT_FACE_UP);
   cur_[A_RESTART] = k({KEY_R}) || b(GAMEPAD_BUTTON_MIDDLE_RIGHT);
+}
+
+void Input::feed(std::initializer_list<Act> down) {
+  std::copy(cur_, cur_ + A_COUNT, prev_);
+  std::fill(cur_, cur_ + A_COUNT, false);
+  for (Act a : down) cur_[a] = true;
 }

@@ -1,6 +1,7 @@
 // Braindust: a 2D thalassophobia action game (raylib).
 // Run from anywhere; it finds the project root (the folder holding levels/ and shaders/).
 //   braindust [levels/name.json] [--spawn x,y] [--shot frames out.png]
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <iterator>
@@ -8,6 +9,7 @@
 #include <vector>
 
 #include "character.hpp"
+#include "content.hpp"
 #include "input.hpp"
 #include "level.hpp"
 #include "panel.hpp"
@@ -21,6 +23,7 @@ namespace {
 
 const char* TUNABLES_PATH = "tunables.json";
 const char* CHARACTER_PATH = "characters/mage.json";
+const char* DATA_DIR = "data";
 
 struct Options {
   std::string levelPath = "levels/abyss.json", shotPath;
@@ -61,6 +64,7 @@ Level loadLevelWithSpawn(const Options& o) {
 Panel tunePanel(World& w) {
   Panel p;
   p.title = "TUNE";
+  p.page = "body, movement, light";
   for (const TunableField& f : TUNABLE_FIELDS)
     p.params.push_back({f.name, f.group, f.step, Tunables{}.*f.field, [&w, &f] { return w.base.*f.field; }, [&w, &f](float v) {
                           w.base.*f.field = std::max(0.f, v);
@@ -68,6 +72,27 @@ Panel tunePanel(World& w) {
                         }});
   p.save = [&w] { return std::string(saveTunables(TUNABLES_PATH, w.base) ? "saved tunables.json" : "save failed"); };
   return p;
+}
+
+// F2 again: every number of every entry of a data file, grouped by entry. Edits apply at once (an enemy's health
+// on its next spawn); defaults are the values the file had when loaded.
+Panel recordsPanel(const char* title, const char* page, RecordSet& set) {
+  Panel p;
+  p.title = title;
+  p.page = page;
+  for (auto& r : set.list)
+    for (auto& [name, v] : r.nums) {
+      float* value = &v, a = std::fabs(v);
+      float step = a >= 100 ? 10 : a >= 10 ? 1 : a >= 1 ? .1f : .05f;
+      p.params.push_back({name, r.name, step, v, [value] { return *value; }, [value](float x) { *value = x; }});
+    }
+  p.save = [&set] { return (saveRecords(set) ? "saved " : "save failed: ") + set.path; };
+  return p;
+}
+
+std::vector<Panel> tunePages(World& w, Content& c) {
+  return {tunePanel(w), recordsPanel("MOVES", "data/moves.json", c.moves), recordsPanel("ENEMIES", "data/enemies.json", c.enemies),
+          recordsPanel("ITEMS", "data/items.json", c.items)};
 }
 
 }  // namespace
@@ -80,6 +105,9 @@ int main(int argc, char** argv) {
   World world(synth);
   try { world.level = loadLevelWithSpawn(opt); } catch (const std::exception& e) { std::fprintf(stderr, "braindust: %s\n", e.what()); return 1; }
   world.base = loadTunables(TUNABLES_PATH);
+  Content content;
+  try { content = loadContent(DATA_DIR); } catch (const std::exception& e) { std::fprintf(stderr, "braindust: %s\n", e.what()); return 1; }
+  world.content = &content;
 
   SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | (opt.shotFrames ? FLAG_WINDOW_HIDDEN : 0));
   InitWindow(1280, 720, "Braindust");
@@ -105,7 +133,8 @@ int main(int argc, char** argv) {
   scene3d.place(world);
 
   Input input;
-  Panel tune = tunePanel(world);
+  std::vector<Panel> pages = tunePages(world, content);
+  int page = -1;  // the open tune page; -1: playing
   bool help = false;
 
   for (int frame = 0; !WindowShouldClose(); frame++) {
@@ -114,11 +143,24 @@ int main(int argc, char** argv) {
     input.poll();
     if (IsKeyPressed(KEY_M)) synth.toggleMute();
     if (IsKeyPressed(KEY_F1)) help = !help;
-    if (IsKeyPressed(KEY_F2) || IsKeyPressed(KEY_TAB)) tune.toggle();
-    if (tune.open) tune.input(renderer.ui);
-    if (IsKeyPressed(KEY_F5)) {  // reload tunables, the character and the level from disk
+    if (IsKeyPressed(KEY_F2) || IsKeyPressed(KEY_TAB)) {  // the next page, then back to the game
+      if (page >= 0) pages[page].open = false;
+      page = page + 1 < int(pages.size()) ? page + 1 : -1;
+      if (page >= 0) pages[page].toggle();
+    }
+    if (page >= 0) {
+      pages[page].input(renderer.ui);
+      if (!pages[page].open) page = -1;
+    }
+    if (IsKeyPressed(KEY_F5)) {  // reload tunables, data, the character and the level from disk
       world.base = loadTunables(TUNABLES_PATH);
       std::string failed;
+      try {
+        Content c = loadContent(DATA_DIR);
+        content = std::move(c);
+        pages = tunePages(world, content);
+        if (page >= 0) pages[page].toggle();
+      } catch (const std::exception& e) { failed = e.what(); }
       try {
         Character c = loadCharacter(CHARACTER_PATH);
         unloadCharacter(character);
@@ -130,11 +172,11 @@ int main(int argc, char** argv) {
       if (!failed.empty()) world.say("RELOAD FAILED", failed);
     }
     if (opt.shotFrames) world.banner.t = 0;
-    if (!tune.open) {  // the tune menu pauses the game
+    if (page < 0) {  // the tune pages pause the game
       world.update(dt, input);
       scene3d.update(dt, world);
     }
-    renderer.draw(world, scene3d, &tune, help);
+    renderer.draw(world, scene3d, page >= 0 ? &pages[page] : nullptr, help);
     if (opt.shotFrames && frame + 1 >= opt.shotFrames) {
       renderer.screenshot(opt.shotPath);
       break;
