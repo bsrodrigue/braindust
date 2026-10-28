@@ -1,5 +1,5 @@
 // Screen metrics and crisp text. HUD units: render px / S, so 600 x 540 units always fit the window.
-// The game renders at scale x the screen (platform::renderScale: 1 on the desktop) and is stretched to it.
+// The game renders at scale x the screen (maxHeight, or --scale) and is stretched to it.
 #pragma once
 #include <string>
 #include <unordered_map>
@@ -10,6 +10,7 @@ class Ui {
  public:
   int RW = 0, RH = 0;               // render size, px (the window size x scale)
   float scale = 1;                  // render px per screen px
+  float maxHeight = 0;              // render at most this many px tall (graphics quality), 0: the screen's height
   float S = 1, VW = 600, VH = 540;  // px per unit; view size in units
 
   void loadFonts();  // system fonts; raylib's default font when none is found

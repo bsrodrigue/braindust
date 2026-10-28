@@ -15,16 +15,38 @@ class Renderer {
  public:
   Ui ui;
 
+  // What the GPU spends per frame. The post pass and the render size dominate on phones (see drawTimings / F3).
+  //   Low:    at most 540 px tall, no god rays, no caustics, no chromatic aberration
+  //   Medium: at most 720 px tall, god rays in 8 steps (Android's default)
+  //   High:   full size, everything (the desktop's default)
+  // All three draw the 3D background at half size except High: it is soft and fogged by design.
+  enum class Quality { Low, Medium, High };
+  static const char* qualityName(Quality q);
+  static Quality qualityByName(const std::string& name, Quality otherwise);
+  void setQuality(Quality q);
+  Quality quality() const { return quality_; }
+
   void load();
-  void resize(World& w);  // render targets follow the window; also sets the world's view size
+  void resize(World& w);  // render targets follow the window and the quality; also sets the world's view size
   // overlay: drawn over the HUD, in HUD units (menus, tune pages, help, touch controls)
   void draw(const World& w, Scene3D& scene3d, const std::function<void()>& overlay);
   void drawHelp(bool touch);
+
+  // F3 (or the menu): frame timings, ms. While on, the renderer waits for the GPU after each pass, so a pass's time
+  // includes its GPU work (and the frame gets a little slower). present includes waiting for the screen's refresh.
+  struct Timings { double scene3d = 0, world = 0, post = 0, present = 0, sim = 0; };
+  bool profiling = false;
+  Timings avg;      // smoothed over about half a second
+  int profiled = 0; // frames measured
+  void addSim(double ms) { avg.sim += (ms - avg.sim) * .05; }
+  void drawTimings();
   bool screenshot(const std::string& path) const;
 
  private:
-  RenderTexture2D bg_{}, fg_{}, world_{}, dark_{}, final_{};
-  Shader post_{}, tile_{};
+  RenderTexture2D bg_{}, fg_{}, world_{}, dark_{}, merged_{}, bloom_{}, final_{};
+  Shader post_{}, tile_{}, merge_{}, bloomSh_{};
+  Quality quality_ = Quality::High;
+  bool targetsDirty_ = false;  // the quality changed: rebuild the render targets
   std::unordered_map<std::string, Texture2D> tiles_;
   struct Mote { float x, y, d; };
   std::vector<Mote> snow_;

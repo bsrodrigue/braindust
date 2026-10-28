@@ -7,6 +7,8 @@
 #include "rlgl.h"
 #include "util.hpp"
 
+extern "C" void glFinish(void);  // OpenGL and OpenGL ES alike; only called while profiling
+
 namespace {
 void premultBlend() {
   rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA, RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
@@ -28,9 +30,22 @@ void fillPoly(const std::vector<Vector2>& p, Color c) {
 }
 void glow(float x, float y, float r, Color c) { DrawCircleGradient(int(x), int(y), r, c, alpha(c, 0)); }
 
+const char* Renderer::qualityName(Quality q) { return q == Quality::Low ? "low" : q == Quality::Medium ? "medium" : "high"; }
+Renderer::Quality Renderer::qualityByName(const std::string& name, Quality otherwise) {
+  for (Quality q : {Quality::Low, Quality::Medium, Quality::High}) if (name == qualityName(q)) return q;
+  return otherwise;
+}
+void Renderer::setQuality(Quality q) {
+  quality_ = q;
+  ui.maxHeight = q == Quality::Low ? 540 : q == Quality::Medium ? 720 : 0;
+  targetsDirty_ = true;
+}
+
 void Renderer::load() {
   ui.loadFonts();
   post_ = platform::loadShader(nullptr, "shaders/post.fs");
+  merge_ = platform::loadShader(nullptr, "shaders/merge.fs");
+  bloomSh_ = platform::loadShader(nullptr, "shaders/bloom.fs");
   tile_ = platform::loadShader(nullptr, "shaders/tile.fs");
   float sat = .5f;
   SetShaderValue(tile_, GetShaderLocation(tile_, "uSat"), &sat, SHADER_UNIFORM_FLOAT);
@@ -40,9 +55,17 @@ void Renderer::load() {
 
 void Renderer::resize(World& w) {
   bool first = ui.RW == 0;
-  if (ui.resize()) {
-    if (!first) for (auto* r : {&bg_, &fg_, &world_, &dark_, &final_}) UnloadRenderTexture(*r);
-    for (auto* r : {&bg_, &fg_, &world_, &dark_, &final_}) { *r = LoadRenderTexture(ui.RW, ui.RH); SetTextureFilter(r->texture, TEXTURE_FILTER_BILINEAR); }
+  if (ui.resize() || targetsDirty_) {
+    targetsDirty_ = false;
+    auto all = {&bg_, &fg_, &world_, &dark_, &merged_, &bloom_, &final_};
+    if (!first) for (auto* r : all) UnloadRenderTexture(*r);
+    int div = quality_ == Quality::High ? 1 : 2;  // the 3D background (and near pass) at half size: soft and fogged anyway
+    for (auto* r : all) {
+      int w = r == &bg_ || r == &fg_ ? ui.RW / div : r == &bloom_ ? ui.RW / 4 : ui.RW;
+      int h = r == &bg_ || r == &fg_ ? ui.RH / div : r == &bloom_ ? ui.RH / 4 : ui.RH;
+      *r = LoadRenderTexture(std::max(1, w), std::max(1, h));
+      SetTextureFilter(r->texture, TEXTURE_FILTER_BILINEAR);
+    }
   }
   w.view = {ui.VW, ui.VH};
 }
@@ -57,13 +80,36 @@ Vector2 Renderer::project(const World& w, const Camera3D& c, Vector3 p) const {
 }
 
 void Renderer::draw(const World& w, Scene3D& scene3d, const std::function<void()>& overlay) {
+  double t0 = GetTime();
+  auto lap = [&](double& avgMs) {  // the time since the last lap, GPU work included
+    if (!profiling) return;
+    rlDrawRenderBatchActive();
+    glFinish();
+    double t = GetTime(), ms = (t - t0) * 1000;
+    avgMs += (ms - avgMs) * (profiled ? .05 : 1);
+    t0 = t;
+  };
   scene3d.render(w, bg_, fg_);
+  lap(avg.scene3d);
   worldPass(w, scene3d);
-  composite(w, overlay);
+  lap(avg.world);
+  composite(w, [&] {
+    if (overlay) overlay();
+    if (profiling) drawTimings();
+  });
+  lap(avg.post);
   BeginDrawing();
   ClearBackground(BLACK);
   DrawTexturePro(final_.texture, {0, 0, float(ui.RW), -float(ui.RH)}, {0, 0, float(GetScreenWidth()), float(GetScreenHeight())}, {0, 0}, 0, WHITE);
   EndDrawing();
+  lap(avg.present);
+  if (profiling) profiled++;
+}
+
+void Renderer::drawTimings() {
+  const char* s = TextFormat("%d fps   3D %.1f   world %.1f   post+HUD %.1f   present %.1f   sim %.1f ms   %dx%d %s", GetFPS(), avg.scene3d,
+                             avg.world, avg.post, avg.present, avg.sim, ui.RW, ui.RH, qualityName(quality_));
+  ui.text(s, ui.VW / 2, 6, 10, hex("#f0c060"), false, true);
 }
 
 bool Renderer::screenshot(const std::string& path) const {
@@ -259,11 +305,35 @@ void Renderer::inscriptions(const World& w) {
   EndBlendMode();
 }
 
+// one pass of shader sh over a whole target, reading src; blending off, so what it writes (alpha too) is what is stored
+static void fullscreen(RenderTexture2D& target, Shader sh, Texture2D src, const std::function<void()>& uniforms) {
+  BeginTextureMode(target);
+  rlDisableColorBlend();
+  BeginShaderMode(sh);
+  if (uniforms) uniforms();
+  DrawTexturePro(src, {0, 0, float(src.width), -float(src.height)}, {0, 0, float(target.texture.width), float(target.texture.height)}, {0, 0}, 0, WHITE);
+  EndShaderMode();
+  rlEnableColorBlend();
+  EndTextureMode();
+}
+
+// the layers merged once (so the post pass reads one texture, not three), bloom at a quarter size, then the post pass
 void Renderer::composite(const World& w, const std::function<void()>& overlay) {
+  Vector2 res{float(ui.RW), float(ui.RH)};
+  fullscreen(merged_, merge_, bg_.texture, [&] {
+    SetShaderValue(merge_, GetShaderLocation(merge_, "uRes"), &res, SHADER_UNIFORM_VEC2);
+    SetShaderValueTexture(merge_, GetShaderLocation(merge_, "texWorld"), world_.texture);
+    SetShaderValueTexture(merge_, GetShaderLocation(merge_, "texFg"), fg_.texture);
+  });
+  // bloom at every quality: cheap at a quarter size, and the sunset's glow is mostly bloom
+  fullscreen(bloom_, bloomSh_, merged_.texture, [&] {
+    Vector2 out{float(bloom_.texture.width), float(bloom_.texture.height)};
+    SetShaderValue(bloomSh_, GetShaderLocation(bloomSh_, "uRes"), &res, SHADER_UNIFORM_VEC2);
+    SetShaderValue(bloomSh_, GetShaderLocation(bloomSh_, "uOut"), &out, SHADER_UNIFORM_VEC2);
+  });
   BeginTextureMode(final_);
   BeginShaderMode(post_);
   auto set = [&](const char* name, const void* v, int type) { SetShaderValue(post_, GetShaderLocation(post_, name), v, type); };
-  Vector2 res{float(ui.RW), float(ui.RH)};
   float shallow = w.inPocket ? 0 : clampf(1 - w.cam.y / 1500, 0, 1), deep = w.inPocket ? 0 : clampf(w.cam.y / 3500, 0, 1), pk = w.inPocket;
   float waterY = w.inPocket ? -1e5f : (0 - w.cam.y) * ui.S;
   set("uRes", &res, SHADER_UNIFORM_VEC2);
@@ -276,9 +346,13 @@ void Renderer::composite(const World& w, const std::function<void()>& overlay) {
   set("uWarp", &w.warp, SHADER_UNIFORM_FLOAT);
   set("uWaterY", &waterY, SHADER_UNIFORM_FLOAT);
   set("uDark", &darkNow_, SHADER_UNIFORM_FLOAT);
-  SetShaderValueTexture(post_, GetShaderLocation(post_, "texWorld"), world_.texture);
-  SetShaderValueTexture(post_, GetShaderLocation(post_, "texFg"), fg_.texture);
-  DrawTextureRec(bg_.texture, {0, 0, float(ui.RW), -float(ui.RH)}, {0, 0}, WHITE);
+  float on = quality_ != Quality::Low, rays = quality_ == Quality::High ? 16.f : quality_ == Quality::Medium ? 8.f : 0.f, bl = 1;
+  set("uChroma", &on, SHADER_UNIFORM_FLOAT);
+  set("uCaustics", &on, SHADER_UNIFORM_FLOAT);
+  set("uBloom", &bl, SHADER_UNIFORM_FLOAT);
+  set("uRays", &rays, SHADER_UNIFORM_FLOAT);
+  SetShaderValueTexture(post_, GetShaderLocation(post_, "texBloom"), bloom_.texture);
+  DrawTexturePro(merged_.texture, {0, 0, res.x, -res.y}, {0, 0, res.x, res.y}, {0, 0}, 0, WHITE);
   EndShaderMode();
   drawHud(w);
   if (overlay) overlay();

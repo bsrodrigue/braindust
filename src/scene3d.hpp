@@ -22,17 +22,21 @@ class Scene3D {
   const std::vector<TowerLight>& towerLights() const { return towerLights_; }
   bool farLeviathanVisible(const World& w) const { return farPass_ && !w.nearActive; }
   void farLeviathanEyes(Vector3 out[2]) const;
+  int drawnStatics() const { return drawn_; }
+  int totalStatics() const { return int(statics_.size()); }
 
  private:
   struct Seg { Vector3 p; float r; };
   enum class Kind { Rock, Skull, UniverseSkull, Tower, ProceduralSkull, Floor };
-  struct Static { Kind kind; int aux; Matrix m; };  // aux: rock mesh index, or 1 for the playfield skulls
+  struct Static { Kind kind; int aux; Matrix m; Vector3 c{}; float r = 0; };  // aux: rock mesh index, or 1 for the playfield
+                                                                              // skulls; c, r: bounding sphere (culling)
 
   Shader sceneSh_{}, unlitSh_{};  // every 3D draw uses one of ours: raylib's default shader is mediump on OpenGL ES
   Material rock_{}, bone_{}, floor_{}, skin_{}, fin_{}, tooth_{}, eye_{}, galaxyMat_{}, black_{};
   Mesh seg_{}, spine_{}, fang_{}, sphere_{}, floorMesh_{};
   std::vector<Mesh> rocks_;
   Model skull_{}, tower_{};
+  Mesh skullLod_{};  // the skull's shell, simplified: for skulls that are small on screen
   bool skullOK_ = false, towerOK_ = false;
   Texture2D sclera_{};
 
@@ -42,6 +46,7 @@ class Scene3D {
   struct { bool ok = false; Matrix m; Vector3 eye; } dreamer_;
   float levT_ = 0;
   int lastPass_ = -1;
+  int drawn_ = 0;  // statics drawn last frame (the rest were outside the view)
   bool farPass_ = false;  // this 40 s pass belongs to the far leviathan (every third one is the near one's)
   std::vector<Seg> farLev_ = std::vector<Seg>(48), nearLev_ = std::vector<Seg>(48);
 
@@ -49,4 +54,6 @@ class Scene3D {
   void setUniforms(Color fog, float density, Vector3 amb, Vector3 sun, const std::vector<std::pair<Vector3, Vector4>>& lights);
   void drawLeviathan(const std::vector<Seg>& L, bool withEye);
   void drawStatic(const Static& s);
+  BoundingBox localBox(const Static& s) const;
+  bool inView(const Static& s, float aspect) const;
 };

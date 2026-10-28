@@ -26,7 +26,8 @@ void Ui::loadFonts() {
 }
 
 bool Ui::resize() {
-  scale = platform::renderScale();
+  float forced = platform::renderScaleOverride();
+  scale = forced > 0 ? forced : maxHeight > 0 ? std::min(1.f, maxHeight / std::max(1, GetScreenHeight())) : 1;
   int w = std::max(1, int(std::lround(GetScreenWidth() * scale))), h = std::max(1, int(std::lround(GetScreenHeight() * scale)));
   if (w == RW && h == RH) return false;
   RW = w; RH = h;
