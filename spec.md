@@ -6,7 +6,7 @@ Living document. Updated as prototypes change. Last update: 2026-10-28.
 
 A 2D action-exploration game about a black mage whose magic lives in his cranium. Spending magic beyond your means costs blood, and blood-casting turns the brain into stardust. Set in an ocean of thalassophobia and cosmic horror: giant skulls on the seafloor, universes inside their cracks, things that escaped from minds.
 
-**World:** a set of **areas**, each its own **biome** (see 7b). The sea is the first; a crocodile swamp and a lake of blood come next.
+**World:** a set of **areas**, each its own **biome** (see 7b). The sea is the first; a lake of blood and, late in the game, a crocodile swamp follow.
 
 **Core feeling:** dread and temptation. Power is always available, but it is paid for with your body and your mind.
 
@@ -186,21 +186,24 @@ The game is a set of **areas**. Each area is a **biome**: its own ground and liq
 | The Shore of Kingdoms | Sunset coast: villages, rooftops, the monks' tower, the pier | `levels/shore.json` | Built |
 | The Sea | Deep ocean: darkness, pressure, giant infant skulls, lurkers, leviathans | `levels/abyss.json`, `levels/corpses.json` | Built |
 | Inside the crack | A dreaming cosmos: low gravity, galaxy backdrop, escaped thoughts | Fixed pocket room | Built (one room) |
-| The Lake of Crocos | Crocodile swamp: mist, black-green water, mound huts and stepped temples | — | Concept |
+| The Lake of Crocos | Crocodile swamp: mist, black-green water, mound huts and stepped temples; horrifying, hostile crocos | — | Concept, **late game** |
 | The Lake of Blood | A river of blood in a dry savanna, choked with corpses and a mosquito swarm | — | Concept |
 
-### The Lake of Crocos (concept)
+### The Lake of Crocos (concept, late game)
+A late-game area: the player arrives with the full moveset, and the crocos are among the hardest enemies.
+
 Art: `docs/Concept-Arts/CrocoMage.jpeg`, `CrocoMage2.jpeg`, `CrocoMage3.jpeg`, `LakeOfCrocos.jpeg`.
 - **Look:** purple-to-amber dusk, low mist on still black-green water, algae and drowned logs, dead trees hung with moss, rock arches and spires. Mound huts of earth and grass; stepped temples behind them.
-- **People:** a crocodile tribe, the first people met as people (this answers the backlog question on tribes and kingdoms). Warriors with spears, round shields, bone and leather armour; plain crocodiles basking and lurking in the shallows.
-- **The Croco Mage:** a crocodile mage whose cranium has swollen far beyond any wrapper: veined, translucent, one blind white eye. The three CrocoMage images show the skull growing: **the stardust mechanic, on someone else.** In `LakeOfCrocos.jpeg` he sits enthroned, old and robed, with a staff hung with glowing vials (stardust drug?), books and a scroll at his feet.
+- **The crocos:** horrifying, hostile creatures, not people to meet. The art shows them living like a tribe (mound huts, temples, a throne): warriors with spears, round shields, bone and leather armour; plain crocodiles basking and lurking in the shallows.
+- **The Croco Mage:** a powerful mage, but **not necessarily smarter than a human mage**: the skulls' power swelled his cranium, not his mind. His cranium has swollen far beyond any wrapper: veined, translucent, one blind white eye. The three CrocoMage images show the skull growing: **the stardust mechanic, on someone else.** In `LakeOfCrocos.jpeg` he sits enthroned, old and robed, with a staff hung with glowing vials, books and a scroll at his feet.
+- **Lore (open):** how the Croco Mage found the power of the skulls and got high on it, to the point of such a cranium. Still to be found.
 - **Fear:** what waits under shallow, murky water.
 - **Gameplay ideas (proposals):**
   - Shallow water you wade through: slower, no swimming, and you cannot see what is under it. Crocodiles wait there.
   - Shield warriors that block the wand from the front; the charged thrust breaks the guard. This needs a resistance that depends on which way the enemy faces.
-  - Mosquitoes in the reeds, a first taste of the Lake of Blood.
-- **Twist on the core mechanic (proposal):** the tribe trades in stardust vials, so stardust becomes something you can spend and buy, not only suffer.
-- **Open questions:** is the Croco Mage an ally, a boss, or both (a mind that went too far, fought in stages as his skull swells)? Is the tribe hostile, neutral, or does it depend on your stardust?
+  - Mosquitoes in the reeds, kin to the Lake of Blood's swarm.
+- **Twist on the core mechanic:** open.
+- **Open questions:** the Croco Mage's origin (above). Is he the area's boss, fought in stages as his skull swells?
 
 ### The Lake of Blood (concept)
 Art: `docs/Concept-Arts/LakeOfBlood.jpeg` to `LakeOfBlood4.jpeg` (escalating: the swarm, then eggs and larvae, then human faces, then the brood mother).
@@ -257,7 +260,7 @@ Art: `docs/Concept-Arts/LakeOfBlood.jpeg` to `LakeOfBlood4.jpeg` (escalating: th
 - Some creatures were created by minds and escaped from craniums.
 - Some places exploded the skulls of the mages who imagined them.
 - Mages are a minority: tribes and kingdoms have their own business and wars.
-- Mages are not only human: the crocodile tribe of the swamp has its own mage, his cranium swollen past saving (7b).
+- Mages are not only human: the Croco Mage of the swamp (7b) found the power of the skulls and got high on it, until his cranium swelled past saving. He is powerful, but not necessarily smarter than a human mage. How he found that power is still open.
 
 ## 11. Planned / backlog
 
@@ -267,8 +270,9 @@ Art: `docs/Concept-Arts/LakeOfBlood.jpeg` to `LakeOfBlood4.jpeg` (escalating: th
 - [ ] **Giant skull dungeon** (playable).
 - [x] Spells as traversal: the star leap. Still open: blink, levitate, wall-break.
 - [x] Stardust drug, the consumer side: dust vials. Still open: harvesting dust from mages, predator mages.
-- [ ] Tribes and kingdoms: the crocodile tribe is met as people (7b). Still open: quests, factions, whether others are.
-- [ ] **Areas and biomes** (7b): `data/biomes.json` and a `biome` per level; the Lake of Crocos; the Lake of Blood with the mosquito, egg clusters, larvae and the brood mother.
+- [ ] Decide whether tribes and kingdoms are met as people (quests, factions) or stay background. (The crocos are not people: hostile creatures, 7b.)
+- [ ] **Areas and biomes** (7b): `data/biomes.json` and a `biome` per level; the Lake of Blood with the mosquito, egg clusters, larvae and the brood mother; the Lake of Crocos, late game.
+- [ ] Lore: how the Croco Mage found the power of the skulls.
 - [ ] Sound pass: authored ambience, creature voices.
 
 ## 12. Assets
@@ -342,6 +346,7 @@ Lower path: crates to hop, a fire and a villager.
 
 ## 13. Changelog
 
+- **2026-10-28** The Lake of Crocos is a late-game area of horrifying, hostile crocos; the Croco Mage is powerful but no smarter than a human mage, and his origin is open.
 - **2026-10-28** World structure: areas, each its own biome (7b). Two new areas from the concept art in `docs/Concept-Arts/`: the Lake of Crocos and the Lake of Blood.
 
 - **2026-10-28** Land tiles: the grass top-left and top-right corners were swapped (a notch of sky at every step); the last column of a solid is now flush with its right edge, so the rocky rim shows when the width is not a multiple of 64; bridges use only the plank that tiles (the narrow piece left gaps); one-tile-wide pieces get both end caps; grass stays under crates and stones, and is replaced by dirt only where higher ground actually rises from it.
