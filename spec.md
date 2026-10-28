@@ -1,0 +1,279 @@
+# Braindust — Game Specification
+
+Living document. Updated as prototypes change. Last update: 2026-10-26.
+
+## 1. Vision
+
+A 2D action-exploration game about a black mage whose magic lives in his cranium. Spending magic beyond your means costs blood, and blood-casting turns the brain into stardust. Set in an ocean of thalassophobia and cosmic horror: giant skulls on the seafloor, universes inside their cracks, things that escaped from minds.
+
+**Core feeling:** dread and temptation. Power is always available, but it is paid for with your body and your mind.
+
+**Pillars** (from the design theory notes):
+- Deep combat with real mastery (you win because you are good, not because of loot)
+- Deep exploration, no hand holding, secrets
+- Theory crafting (helmets, wands, risk budgets)
+- Deep lore, discovered rather than explained
+- Real thalassophobia: scale, darkness, sound, things you only half see
+
+## 2. Format decisions
+
+| Decision | Choice | Why |
+|---|---|---|
+| Gameplay plane | 2D side view | Character silhouette shows the cranium mechanic; precise controls; magic can double as traversal |
+| Rendering | 2D playfield + 3D backgrounds | 3D only where it buys immersion (depth, scale, fog); keeps asset cost down |
+| Isometric (TUNIC/Death's Door) | Explored, not chosen | Prototype removed 2026-10-27 |
+
+## 3. Art direction
+
+- **Not cute.** Raw, heavy, desaturated. Gaunt proportions, ragged cloth, tarnished metal, bone.
+- 3D assets are lumpy and organic (noise-displaced), never sleek primitives. Fog hides detail, so 3D background assets can stay low-detail.
+- Readability rule: the 2D playfield is sharp and high-contrast; the 3D background is soft and fogged. Nothing in the background may read as a platform.
+- Light is scarce and diegetic: the cranium, spells, lures, the universe in the giant skull.
+- Film grain, heavy vignette, near-black at depth.
+- Palette (abyss): void `#010204`, ink `#b9c2c4`, tarnished brass `#8f7448`, mana `#7a98a8`, blood `#8e1f2b`, stardust `#8c7aa8`.
+- Reference: `docs/Gemini_Generated_Image_bzuxnnbzuxnnbzux.jpeg` (tiny diver, giant cracked skull with a galaxy inside, bone field).
+
+## 3b. Tileset (land)
+
+- Source: Craftpix "World Tree Roots 2D Platformer Tileset" (`assets/craftpix-net-712113-…zip`); PNGs extracted to `assets/tileset/{platformer,environment,collectable,background}` with lower-case names (e.g. `platformer_ground_02`, `environment_statue`).
+- The art is bright and cartoony, against our direction, so it is **toned down in `shaders/tile.fs`**: 50% desaturation, then a warm multiply (`#e0b49a`) toward the sunset. Not used: the green forest backgrounds, coins, keys.
+- **Land solids** (top above the sea) are tiled at 64 world px per tile. Style per solid (`tile` field, else picked from shape): `ground` (grass top with corners, dirt fill, rocky side edges; edges and grass are skipped where another solid continues the mass), `float` (h ≤ 48: floating island row with caps), `bridge` (wooden planks), `stone` (w ≤ 60: stone-block column), `box` (wooden crate). Underwater rock stays the dark flat style.
+- **Sprite props:** any tileset image placed with `{type: "sprite", name, x, y, scale?, flip?}`, standing on (x, y), drawn at half its pixel size × scale, through the same filter.
+
+## 4. Character: the player
+
+- **Sprite:** the mage-warrior from the concept sheet `docs/Gemini_Generated_Image_l6z59hl6z59hl6z5.jpeg`: woven cranium wrapper, ivory wrapper armour, skull wand, carved spear, shield.
+- **Pipeline:** `python3 tools/extract_player_sprites.py` cuts the sheet (grey background removed, frame numbers and borders dropped, pieces spilling in from neighbouring cells removed, feet aligned on one baseline) into `assets/player.png` (254×212 cells: idle ×4, run ×6, attack ×6) and `assets/player.json` (cell, feet anchor, head position per frame). Re-run it if the sheet changes.
+- **In game:** 96 world px from feet to the top of the wrap (hitbox 28×70; the head rises above it), never rotated, mirrored for left; a cool tint (`#dbe3e6`) to sit in the water; red tint when hurt, flicker while invulnerable.
+- **Cranium:** as stardust rises it swells out of the top of the headwrap (per-frame head position), translucent and veined, with faint motes inside. It leaks stardust particles in proportion to stardust %.
+
+### 4.1 Animation
+
+| State | Sprite |
+|---|---|
+| Idle, focus | idle cycle, 4 fps |
+| Running on land | run cycle, 6–14 fps with speed |
+| Airborne on land | run frame 2 rising, frame 4 falling |
+| In the water (falling in, swimming, sinking) | idle cycle at a slow 2.5 fps, a drift (never the walk cycle) |
+| Stroke (Space) | body squashes ~8% |
+| Wand strike | attack frames 1, 2, 5, 6 over 0.36 s (raise, thrust, recover) |
+| Star bolt | attack frame 3 (thrust with aura) then 4 (open-palm aura) |
+| Flare | attack frame 4, held |
+
+On top of the sprite: a slow breathing bob and a squash on each stroke. The player never rotates.
+
+### 4.2 Post-processing (`shaders/post.fs`)
+
+The 3D background, the 3D near-pass layer and the 2D world are composited by one full-screen shader; the HUD sits on its own canvas above it, undistorted.
+- Refraction wobble (stronger with depth)
+- Chromatic aberration toward the edges (stronger in the pocket universe)
+- Bloom on every light: lures, windows, bolts, cranium, the universe in the skull
+- God rays from the surface, broken by the shaft walls (shallow only)
+- World-anchored caustics, subtle, fading out by ~150 m
+- Grade: teal floor in the shadows, slight desaturation, cool tint
+- Vignette and film grain
+
+## 5. Core mechanics
+
+### 5.1 Mana → blood → stardust
+- Spells cost mana. If mana is short, the **missing amount is paid in HP** (`bloodRatio` HP per mana point).
+- Every mana point paid in blood adds `dustPerBlood` % **stardust**. Stardust is permanent by default (`dustDecay` = 0).
+- Stardust raises spell power: `power = 1 + dust/100 × dustPower`.
+- Stardust raises sight in the dark: `sight = lightBase + dust × dustLight` (+ flare).
+- 100% stardust = death ("your mind scattered"). Blood-casting at 0 HP also kills you.
+
+### 5.1b Land and water
+- The sea surface is y = 0. With the chest above it the player is **on land**; below it the swimming rules apply (`sink`, `stroke`, `swim`): gravity changes at the surface.
+- **Land jump (Blasphemous-like, weighty):** fast committed rise (`jump` 780 px/s against `landGravity` 2800 → ~110 px, ~0.28 s up), heavier fall (`fallGravity` 4600, `maxFall` 1150) so there is almost no float at the apex; ~0.5 s total airtime. Releasing jump early multiplies the rise by `jumpCut` 0.45 (a short hop ~22 px). Air control is committed (`airControl` 0.35 of `groundAccel` 18). `coyoteTime` 0.08 s and `jumpBuffer` 0.1 s keep it forgiving. Landings from speed squash the sprite, kick dust and thud.
+- Crossing the surface splashes and slows the fall into the water. A stroke just under the surface **breaches**: a leap out of the water back onto land.
+- Enemies stay in the water.
+- Above the water: a sunset sky, a distant coastal city with lit windows, ships under sail, headlands, and level props (huts, fire, villagers, pier posts, a pirogue). Underwater post effects (refraction, caustics, god rays, teal grade) stop at the waterline; the sky gets a warm grade.
+
+### 5.2 Mana sources
+- Passive regen (`manaRegen`/s).
+- Wand melee hits (`manaPerHit`), Hollow Knight "soul" style.
+
+### 5.3 Focus
+- Hold F, standing still: spend `focusCost` mana over `focusTime` s to heal `focusHeal` HP. Cannot be paid in blood.
+
+### 5.4 Light and being seen (abyss)
+- Darkness thickens slowly with depth, capped at 68% (reached around 400 m). You see clearly only inside your light; the post pass keeps the deep dark teal, never dead black.
+- Lurkers notice you within `sight × lureSight`. **More light = see more, and be seen from farther.**
+- Flare (L): floods light for `flareTime` s, damages nearby enemies, and makes the distant photophores go dark (something noticed you).
+
+### 5.5 Pressure
+- Below `pressureDepth` metres, stardust rises by `pressure` %/s even without casting.
+
+### 5.6 Tunables (current defaults, `tunables.json`)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| maxHp / maxMana | 100 / 100 | |
+| manaRegen | 3 | mana/s |
+| manaPerHit | 11 | mana per wand hit |
+| bloodRatio | 0.6 | HP per missing mana point |
+| dustPerBlood | 0.3 | stardust % per mana paid in blood |
+| dustPower | 1.5 | spell damage bonus at 100% dust |
+| dustDecay | 0 | stardust %/s recovered |
+| lightBase | 160 | px of sight with intact brain |
+| dustLight | 2.5 | px of sight per stardust % |
+| flareCost / flareLight / flareTime / flareDmg | 35 / 300 / 2.5 / 15 | |
+| boltCost / boltDmg | 25 / 20 | |
+| focusCost / focusHeal / focusTime | 33 / 25 / 0.9 | |
+| pressureDepth / pressure | 300 m / 0.15 %/s | |
+| lureSight | 1.2 | lurker notice range × your light |
+| lungeSpeed | 520 | lurker strike speed px/s |
+| staffDmg | 10 | |
+| swim / stroke / sink | 200 / 260 / 180 | water movement px/s |
+| runSpeed / groundAccel / airControl | 230 / 18 / 0.35 | land movement |
+| jump / landGravity / fallGravity / maxFall | 780 / 2800 / 4600 / 1150 | land jump arc |
+| jumpCut / coyoteTime / jumpBuffer | 0.45 / 0.08 s / 0.1 s | jump forgiveness |
+| respawn | 10 s | enemy respawn |
+
+## 6. Controls
+
+←/→ swim · Space stroke up · ↓ dive · J wand · K star bolt · L flare · F (hold) focus · M mute · R restart. Touch pad on phones.
+
+## 7. Enemies
+
+| Enemy | Where | Behaviour |
+|---|---|---|
+| **Lurker** (anglerfish) | Abyss shaft | Drifts with lure lit → notices you (light-based) → **lure goes dark**, stalks at ~110–160 px, jaw working → **lunges** with jaws wide → recovers. Contact damage 12. |
+| **Escaped thought** | Pocket universe | Pale flesh mass with several eyes and tendrils; chases within 320 px. Lore: a creature that escaped from a cranium. |
+| **Leviathan** | 3D background (not hittable) | 48-segment eel body with spines and needle teeth. Far passes behind you at depth > 120 m; every third pass at depth > 180 m it slides **between the camera and you**, lit only by your light, with a pale eye. Groans on each pass. |
+
+## 8. Level: the Abyss (prototype)
+
+- Vertical shaft, 520 m deep (10 px = 1 m), jagged walls and ledges, surface light fading by ~90 m.
+- 3D layers: lumpy rock spires, marine snow, surface light shafts, far leviathan, photophore rows far below.
+- **The drowned tower** (3D background): visible as a murky silhouette near the surface, its burst cranium crown glowing faint violet; at depth only ~12 flickering amber windows (some dead) remain, drawn through the darkness.
+- **Seafloor graveyard:** a giant half-buried skull with a galaxy visible through a crack (it lights the graveyard), 18 smaller skulls, ribcages, scattered bones.
+- **Playfield skulls (3D, Blender model):** two half-buried infant skulls standing in the playfield itself, cracks pinned to the gameplay plane so hitboxes line up at any camera position.
+  - **The dreamer** (scale 2.6, tilted face-down into the silt): its crack is the **portal** → pocket universe. Inside: a dimmed galaxy sphere. **Stardust pours out of the crack** (the dreaming mind evaporating, per the lore): violet, gold and white motes rising and swirling, 30/s, up to 120/s as you come near; the first time you come within 320 px it surges out (burst + low hiss). Its pulsing light opens a ~300 px gap in the darkness.
+  - **The empty one** (scale 1.25, on its side): its crack is empty ("Whoever dreamed here is gone").
+  - 2D drawn skull and cracks remain only as a fallback if the skull model fails to load.
+- **Pocket universe:** open space, low gravity, galaxy backdrop, floating platforms, escaped thoughts, golden altar = end of run ("A mind, still dreaming inside its skull"). Blue crack returns to the seafloor.
+
+## 9. Audio (procedural, Web Audio)
+
+- Drone: low-passed brown noise + beating low sines; louder and darker with depth.
+- Leviathan groans (far: quiet; near: loud with screen shake).
+- Heartbeat driven by **fear** = depth + missing HP + nearby lurkers + near pass. Tempo 50–140 bpm, silent below 0.3 fear.
+- SFX: cast hiss, blood-cast wet hiss, flare sweep, hurt thump, lurker lunge hiss, swim stroke.
+
+## 10. Lore
+
+- Themes: thalassophobia, cosmic horror, magic, conspiracies.
+- A **cosmic drug** created the first generation of mages. Ocean floors hold the giant corpses of babies with giant skulls.
+- Some skull cracks are empty; others contain **universes**. One single most giant skull holds an entire dungeon.
+- Mages grow large, increasingly fragile craniums and wear protective wrappers/helmets (aesthetic, give bonuses).
+- Wands are made from the craniums of former mages.
+- When a cranium breaks, **stardust** leaks out: the mind evaporating. It can alter reality, and usually means the mage is dying and disappearing.
+- Some mages harvest stardust and mix it into drugs that boost magic. They prey on other mages.
+- Ancient monks could warp reality with their minds but had to discipline them to avoid conjuring calamities.
+- Some creatures were created by minds and escaped from craniums.
+- Some places exploded the skulls of the mages who imagined them.
+- Mages are a minority: tribes and kingdoms have their own business and wars.
+
+## 11. Planned / backlog
+
+- [ ] **Escaped calamities:** at high stardust, your leaking mind spawns hostile creatures.
+- [ ] **Helmets** as builds: each modifies crack thresholds, light, pressure resistance, blood ratio.
+- [ ] **Skull wands:** each carries a dead mage's signature spell.
+- [ ] **Stardust drug:** harvest dust from mages for temporary power; competes with your own meter; predator mages.
+- [ ] **Giant skull dungeon** (playable).
+- [ ] Spells as traversal (blink, levitate, wall-break) gated by blood cost.
+- [ ] Decide whether tribes and kingdoms are met as people (quests, factions) or stay background.
+- [ ] Sound pass: authored ambience, creature voices.
+
+## 12. Assets
+
+Pipeline: modelled in Blender through the Blender MCP, exported as GLB (vertex colours as 8-bit RGBA), loaded by raylib.
+
+| Asset | Source | Notes |
+|---|---|---|
+| `assets/giant_skull.glb` | `assets/giant_skull.blend` | Infant-proportioned skull: large lumpy cranium, shattered crown hole with hairline fractures, angular orbits, nasal aperture, crooked fangs (two missing), dislocated gaping mandible. ~26k tris, 880 KB. Vertex colours baked: bone, grime in cavities, silt staining low down, yellowed teeth. Separate `Universe` sphere inside gets the galaxy texture in game (back faces, no fog), seen through the crack. Faces +Z in glTF. Used at scale 12 (giant) and 0.8–3 (graveyard). |
+
+| `assets/drowned_tower.glb` | `assets/drowned_tower.blend` | The drowned tower: a ~62 m leaning mage spire. Flared root claws, irregular swollen sections, five twisting buttress ribs, four broken balconies with hanging stone spurs, three secondary spires growing out like tumours, pinched neck crowned by a burst cranium dome (crack facing the camera). Dark encrusted stone vertex colours, bone crown. ~10.7k faces, 485 KB. In game: scale 0.75, behind the shaft at z −40, crown just under the surface. |
+
+Previews render to `assets/_preview/` (Workbench), since the Flatpak Blender cannot share `/tmp` with the MCP.
+
+## Level: The Sleeping Generation (`levels/corpses.json`)
+
+Second level, inspired by the concept art in `docs/` (the art is inspiration, not canon). 2400 px wide, 420 m deep.
+- **Funnel (0–90 m):** narrow shaft on the left; a rock mass fills the right. First inscription: "They were born dreaming. Nobody woke them."
+- **Trench (90–270 m):** opens under a ceiling of hanging rock teeth into a wide trench of broken bone shelves. Giant infant skulls lie in the 3D background at several depths. Two **dust zones** (places that burst the skull of the mage who imagined them) bend the water and add stardust while you stay inside. A **mana wrapper** hides in an alcove in the left wall; a **dust wrapper** hides under the ceiling teeth on the far right.
+- **The city-skull (270–420 m):** a jagged dome of shell with a gap high on the left, set inside a giant 3D skull whose universe glows through its crack. Tiers inside hold tombs and houses lit by warm lights, a **protection wrapper**, and four **escaped thoughts**. The dreaming portal skull lies on the floor at the centre; the empty crack is outside the dome on the left.
+- Inscriptions carry the lore ("Each skull is a prison, a cosmos, a memory."; "The first mages drank the stars. These are their children.").
+- Palette: surface `#173f4f`, deep `#06040c` (purple-black).
+
+### Land prologue
+A cliff-top fishing village at sunset (two huts, a fire, villagers watching the sea), a rocky step down to a pier with a villager at its end and a pirogue moored below, a far headland with another hut and fire. Inscription at the pier: "The ocean gives. The ocean takes." Walk the pier, dive, and the funnel begins.
+
+### New level mechanics (native build)
+| Field | Effect |
+|---|---|
+| `wrappers` | Pickups. `mana` +3 mana regen; `focus` focus time ×0.6; `protection` +25 max HP and heal; `dust` stardust per blood ×0.6. Reset on restart. |
+| `dustZones` | Inside: +`rate` stardust %/s, strong refraction/aberration warp, HUD warning. |
+| `texts` | Inscriptions fade in within ~220 px; a whisper plays the first time. |
+| `lights` | Static lights: open the darkness and glow. |
+| `thoughts` | Escaped-thought enemies in the sea level. |
+| `decor` | 3D background placement: `skull`, `giant` (with a universe, light and darkness gap), `tower` (with lit windows). |
+| `palette` | Fog/background colours from surface to deep. |
+| `top` | Highest y of the world (negative = land and sky above the sea; default −140). |
+| `props` | Land dressing: `hut`, `villager`, `fire`, `post` (pier post, hangs down 260 px), `boat`, or `sprite` with `name` (any `assets/tileset` image), `scale`, `flip`. |
+| solid `tile` | Land tile style: `ground`, `float`, `bridge`, `stone`, `box`. |
+
+## Level: The Shore of Kingdoms (`levels/shore.json`)
+
+A land level for testing jumps and platforming, sized to the jump (rise ~110 px, ~115–130 px horizontal at full run). 4300 px wide, 150 m of sky, a 130 m pool at the end. Falls never strand you: a lower path runs under everything.
+1. **Village** (start): huts, fire, villagers on flat ground.
+2. **Stairs:** four 70 px steps up.
+3. **Rooftops:** thin platforms (two with huts) with 50–80 px gaps and ±70 px height changes.
+4. **The monks' tower:** two walls, open at the bottom for the lower path; ten alternating ledges 95 px apart and 80 px across, ~1000 px of climb. Inscription: "The monks climbed to quiet their minds."
+5. **The ridge** at −115 m: plates with 90 / 100 / 70 px gaps; a ledge one full-height jump (110 px) above holds a **focus wrapper**. A villager looks out; "From here you can see the kingdoms."
+6. **Descent:** stepping stones down to the **pier**; "The ocean gives. The ocean takes."
+7. **The pool:** two lurkers, a mana wrapper, the dreaming portal skull and the empty crack; a giant skull and the drowned tower behind.
+Lower path: crates to hop, a fire and a villager.
+
+## Tooling
+
+- **Level editor server:** `python3 serve.py` (stdlib only; binds 127.0.0.1) serves the editor, and accepts `PUT /api/levels/<name>.json` (name restricted to `[A-Za-z0-9_-]`, body must be a level object, written atomically). `GET /api/levels` lists levels. three.js r128 + GLTFLoader are vendored in `vendor/`.
+- **Levels** are data in `levels/*.json`: `name, width, height (seafloor, px), spawn, portal, emptyCrack (crack centres), solids [{x,y,w,h}], lurkers [{x,y}]`. The game takes the level path as its first argument (default `levels/abyss.json`); `--spawn x,y` overrides the start. `levels/abyss.json` is the former procedural shaft, exported with the same seed.
+- **Editor** (`editor.html`): pan/zoom canvas with depth ruler; tools: select/move (corner-resize walls), draw wall, lurker, spawn, portal crack, empty crack; inspector for level name/width/depth and selection x/y/w/h; undo/redo, duplicate, nudge, 10 px snap, frame; Save, Copy play command, Copy from view.
+- **Native game** (root: `src/`, `shaders/`, `CMakeLists.txt`; raylib 5.5, C++20): the game (the web prototype it was ported from was removed on 2026-10-27). Layers: 3D background → 2D world + darkness (premultiplied) → 3D near pass → post shader (`shaders/post.fs`, same effects as the web pass) → HUD. 3D models from `assets/*.glb` (vertex colours converted to 8-bit RGBA for raylib), lighting/fog in `shaders/scene.*` with 4 point lights. Procedural audio (`src/synth.hpp`). Code layout: `World` (simulation, no drawing) / `Scene3D` / `Renderer` (passes, scenery, actors, HUD) / `Panel` (generic live-edit list: the tune menu is one, any object can have its own) / `Character` + `Animator` (data-driven sprite sheet and animation state machine, `characters/*.json`). Text is rasterised at its exact pixel size per size used (font cache) and drawn on whole pixels so it stays crisp; inscriptions are drawn in screen space. Tunables in `tunables.json`: edited live in the **F2/Tab tune menu** (grouped Land, Water, Body, Blood & stardust, Spells, Light, Enemies; pauses the game). Keyboard: arrows select/adjust, Shift ×10, Ctrl ×0.1, Backspace resets, S saves. Mouse: hover, click a row, wheel scrolls, −/+ buttons, drag a value to scrub (6 px per step), right-click resets, Save / Defaults / Close buttons, or by hand and reloaded with F5 together with the level. Gamepad supported. `--shot N file.png` renders headless for checks.
+- Not yet editable in the editor: the pocket universe layout, and the native-only fields (wrappers, dust zones, texts, lights, thoughts, decor, palette); the editor preserves them when saving.
+
+## 13. Prototypes
+
+| File | What | Status |
+|---|---|---|
+| `editor.html` | Level editor for `levels/*.json` (needs `serve.py`); copies the command to play a level | Active |
+| `src/`, `shaders/` | The game: native raylib C++ | Active |
+| `characters/*.json` | Characters: sprite sheet + animation state machine (format in README) | Active |
+
+
+## 13. Changelog
+
+- **2026-10-28** Code split from one 1550-line `main.cpp` into modules (world, character, level, tunables, input, ui, panel, scene3d, renderer + scenery/actors/hud). The player's animation is now data: `characters/mage.json` (sheet + state machine, same behaviour as before, checked by `tests/character_test.cpp`). The tune menu is a generic `Panel`, ready for per-object editing. F5 also reloads the character; a failed reload's banner is no longer overwritten by the level title.
+- **2026-10-28** Repo cleanup: the game moved from `port/` to the root (`CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`; build in `build/`). Added `.gitignore` (build output, Blender backups, preview renders, the Craftpix zip).
+- **2026-10-27** In the water the player drifts on a slow idle cycle; the run cycle is land-only.
+- **2026-10-27** Fix: the level's left and right edges are walls for the player (the land in The Sleeping Generation extended past the level width, so you could walk off-screen where the camera stops, or off the cliff into the void).
+- **2026-10-27** Craftpix World Tree Roots tileset: land solids tiled (ground/float/bridge/stone/box) through a desaturate-and-warm shader; sprite props from the pack. Shore and Sleeping Generation dressed with signposts, fences, bushes, rocks, roots, ivy, barrels, crates and the stone idol on the monks' ridge.
+- **2026-10-27** Portal skull: the eye is gone, stardust pours out of the crack instead. New platforming level `levels/shore.json`. Tune menu: full mouse support. Crisp text (per-size font rasterisation, pixel-snapped). Solid rock below the waterline no longer gets water light (god rays, caustics, teal lift).
+- **2026-10-27** Weighty Blasphemous-like land jump (separate rise/fall gravity, jump cut, coyote time, jump buffer, committed air control, landing squash/dust/thud); water keeps its own gravity. F2/Tab in-game tune menu for all 38 tunables, saving to `tunables.json`.
+- **2026-10-27** Land before the dive: run/jump physics above the sea, splash and breach, sunset sky with distant city and ships, land props; The Sleeping Generation now starts in a cliff village with a pier. Ocean much brighter: darkness cap 90% → 68% over 400 m, lightBase 85 → 160, lighter fog/ambient/default palette, stronger teal shadow floor, softer vignette. HUD text shadowed.
+- **2026-10-27** Player enlarged (sprite 60 → 96 px, hitbox 20×34 → 28×70, spear reach 52 → 70 px) and never rotates (lean, dive tilt, recoil and hurt jolt removed).
+- **2026-10-27** Player is now the sprite from the concept sheet (`assets/player.png`, cut by `tools/extract_player_sprites.py`), replacing the procedural mage rig and its cloth.
+- **2026-10-27** Web version removed (abyss.html, index.html, tunic.html, vendored three.js, `.gltf.json` copies). raylib is the only build. The editor stays; its Play buttons now copy the native run command.
+- **2026-10-27** Native raylib C++ port (`port/`). New level `levels/corpses.json` (The Sleeping Generation) with wrappers, dust zones, inscriptions, lights, thoughts, 3D decor and palette. Tower exported as `assets/drowned_tower.glb`; GLB vertex colours converted to RGBA8.
+- **2026-10-26** Tooling: levels are JSON (`levels/abyss.json`), local dev server `serve.py`, level editor `editor.html`, vendored three.js; game runs offline.
+- **2026-10-26** Abyss v3.5: procedural character rig (legs, arms, lean, squash, per-action poses) with verlet cloth; WebGL post-processing pass (refraction, caustics, god rays, bloom, grade, aberration, vignette, grain); HUD on its own canvas; ocean less dark (darkness cap 90% reached at ~220 m, lightBase 85, teal shadow floor).
+- **2026-10-26** Abyss v3.4: the drowned tower, second Blender asset, in the background with lit windows that pierce the dark.
+- **2026-10-26** Abyss v3.3: the seafloor portal skull is now the 3D Blender skull in the playfield, with a tracking bloodshot eye (galaxy iris) inside its crack; second 3D skull holds the empty crack.
+- **2026-10-26** Abyss v3.2: first Blender asset. `assets/giant_skull.gltf.json` (source `assets/giant_skull.blend`) replaces the giant skull and the 18 graveyard skulls; primitive skulls remain as a fallback while it loads.
+- **2026-10-26** Abyss v3.1: fixed a fully black screen (the foreground near-pass canvas was clearing to opaque black).
+- **2026-10-26** Abyss v3: art direction reset to raw/non-cute (lumpy noise geometry, muted palette, grain), gaunt mage with wrapped riveted helmet and skull wand, lurkers stalk and lunge with lures going dark, eel leviathan with near pass in front of the camera, photophores below, procedural audio (drone, groans, heartbeat), camera framed to show more abyss below.
+- **2026-10-26** Abyss v2: seafloor skull graveyard, empty/universe cracks, pocket universe, diving helmet.
+- **2026-10-26** Abyss v1: vertical descent, cranium light, flare, lurkers, pressure, far leviathan.
+- **2026-10-26** Side-scroller and isometric prototypes.

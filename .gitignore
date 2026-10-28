@@ -1,0 +1,7 @@
+build/
+*.blend1
+assets/_preview/
+# the Craftpix pack's original zip (extracted into assets/tileset/)
+assets/craftpix-net-*.zip
+.cache/
+compile_commands.json

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Braindust Level Editor</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: top bar, tool rail | canvas | inspector, status line. Dark only: it sits next to the game. */
+:root {
+  --void: #05090b; --panel: #0b1215; --line: #1d2a30; --ink: #b9c2c4; --dim: #59666a;
+  --brass: #8f7448; --mana: #7a98a8; --blood: #8e1f2b; --dust: #8c7aa8; --lure: #5fbfa4;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace; --display: 'Cinzel', Georgia, serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--void); color: var(--ink); font: 12px/1.45 var(--mono); display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: auto 1fr 260px; overflow: hidden; }
+header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font: 700 15px var(--display); letter-spacing: .08em; color: var(--brass); margin: 0 8px 0 0; }
+button, select, input { font: inherit; color: var(--ink); background: #0f181c; border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px; }
+button { cursor: pointer; }
+button:hover { border-color: #3f5a64; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--mana); outline-offset: 1px; }
+button.primary { border-color: var(--brass); color: #e0cfa8; }
+#msg { color: var(--dim); margin-left: auto; }
+#msg.err { color: #d0606c; }
+nav { display: flex; flex-direction: column; gap: 4px; padding: 8px; background: var(--panel); border-right: 1px solid var(--line); }
+nav button { display: grid; grid-template-columns: 1fr auto; gap: 8px; text-align: left; min-width: 128px; }
+nav button kbd { color: var(--dim); font: inherit; }
+nav button[aria-pressed="true"] { border-color: var(--brass); background: #1a1810; color: #e0cfa8; }
+main { position: relative; min-width: 0; }
+canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+aside { background: var(--panel); border-left: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+aside h2 { font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin: 0 0 6px; }
+.grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 8px; align-items: center; }
+.grid input { width: 100%; font-variant-numeric: tabular-nums; }
+.help { color: var(--dim); }
+.help b { color: var(--ink); font-weight: 500; }
+footer { grid-column: 1 / -1; display: flex; gap: 18px; padding: 4px 16px; background: var(--panel); border-top: 1px solid var(--line); color: var(--dim); font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { body { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr auto auto; } nav { flex-direction: row; flex-wrap: wrap; border-right: 0; } nav button { min-width: 0; } aside { border-left: 0; max-height: 40vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Braindust Editor</h1>
+  <label for="levelSel">Level</label>
+  <select id="levelSel"></select>
+  <input id="fileName" aria-label="File name for New" placeholder="new-level" size="12">
+  <button id="newBtn" type="button">New</button>
+  <button id="saveBtn" type="button" class="primary">Save</button>
+  <button id="playBtn" type="button" title="Saves, then copies the command that runs the native game on this level">Copy play command</button>
+  <button id="playHereBtn" type="button" title="Same, starting the player at the centre of the current view">Copy from view</button>
+  <span id="msg" role="status"></span>
+</header>
+<nav aria-label="Tools">
+  <button type="button" data-tool="select">Select / move <kbd>V</kbd></button>
+  <button type="button" data-tool="rect">Draw wall <kbd>R</kbd></button>
+  <button type="button" data-tool="lurker">Lurker <kbd>L</kbd></button>
+  <button type="button" data-tool="spawn">Spawn <kbd>S</kbd></button>
+  <button type="button" data-tool="portal">Portal crack <kbd>P</kbd></button>
+  <button type="button" data-tool="emptyCrack">Empty crack <kbd>E</kbd></button>
+</nav>
+<main><canvas id="cv" aria-label="Level canvas"></canvas></main>
+<aside>
+  <section>
+    <h2>Level</h2>
+    <div class="grid">
+      <label for="lvName">Name</label><input id="lvName">
+      <label for="lvWidth">Width px</label><input id="lvWidth" type="number" step="10">
+      <label for="lvHeight">Depth m</label><input id="lvHeight" type="number" step="1">
+    </div>
+  </section>
+  <section>
+    <h2 id="selTitle">Selection</h2>
+    <div class="grid" id="selGrid">
+      <label for="sx">x</label><input id="sx" type="number">
+      <label for="sy">y</label><input id="sy" type="number">
+      <label for="sw">w</label><input id="sw" type="number">
+      <label for="sh">h</label><input id="sh" type="number">
+    </div>
+    <p class="help" id="selNone">Nothing selected.</p>
+  </section>
+  <section class="help">
+    <h2>Controls</h2>
+    <b>Drag</b> with a tool to draw or place. <b>Right/middle drag</b> or <b>Space + drag</b> pans, <b>wheel</b> zooms.<br>
+    <b>Corners</b> of a selected wall resize it. <b>Arrows</b> nudge (Shift ×10). <b>Del</b> removes, <b>Ctrl+D</b> duplicates.<br>
+    <b>Ctrl+Z / Ctrl+Shift+Z</b> undo / redo, <b>Ctrl+S</b> saves, <b>G</b> toggles the 10 px grid snap, <b>F</b> frames the level.<br>
+    The seafloor and its 3D graveyard sit at the level's depth; keep a floor wall there. 10 px = 1 m.
+  </section>
+</aside>
+<footer><span id="pos">x 0 · y 0 · 0 m</span><span id="zoomLbl">zoom 100%</span><span id="snapLbl">snap on</span><span id="countLbl"></span></footer>
+
+<script>
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const MARKERS = { spawn: { w: 20, h: 34, color: '#8f7448', label: 'spawn' }, portal: { w: 60, h: 80, color: '#8c7aa8', label: 'portal' }, emptyCrack: { w: 30, h: 48, color: '#59666a', label: 'empty crack' } };
+let L = null, file = 'abyss.json', sel = null, tool = 'select', snap = true, dirty = false;
+let cam = { x: -200, y: -100, z: .5 }, drag = null, mouse = { x: 0, y: 0, wx: 0, wy: 0 }, space = false;
+const undo = [], redo = [];
+
+// ---- level data ----
+const blank = () => {
+  const H = 3000;
+  return { name: 'New level', width: 1000, height: H, spawn: { x: 500, y: 60 }, portal: { x: 500, y: H - 105 }, emptyCrack: { x: 765, y: H - 40 },
+    solids: [{ x: -300, y: 0, w: 400, h: H }, { x: 900, y: 0, w: 400, h: H }, { x: -300, y: H, w: 1600, h: 400 }], lurkers: [] };
+};
+function commit() { undo.push(JSON.stringify(L)); if (undo.length > 200) undo.shift(); redo.length = 0; dirty = true; }
+function history(from, to) { if (!from.length) return; to.push(JSON.stringify(L)); L = JSON.parse(from.pop()); sel = null; dirty = true; sync(); }
+const snapV = v => snap ? Math.round(v / 10) * 10 : Math.round(v);
+// a selection is { kind: 'solid' | 'lurker' | marker name, i } ; box() gives its rectangle in world px
+function box(s) {
+  if (s.kind === 'solid') return L.solids[s.i];
+  if (s.kind === 'lurker') { const l = L.lurkers[s.i]; return { x: l.x - 20, y: l.y - 9, w: 40, h: 18 }; }
+  const m = L[s.kind], d = MARKERS[s.kind];
+  return s.kind === 'spawn' ? { x: m.x - d.w / 2, y: m.y, w: d.w, h: d.h } : { x: m.x - d.w / 2, y: m.y - d.h / 2, w: d.w, h: d.h };
+}
+function hit(wx, wy) {
+  const inside = b => wx >= b.x && wx <= b.x + b.w && wy >= b.y && wy <= b.y + b.h;
+  for (const k of ['spawn', 'portal', 'emptyCrack']) if (inside(box({ kind: k }))) return { kind: k };
+  for (let i = L.lurkers.length - 1; i >= 0; i--) if (inside(box({ kind: 'lurker', i }))) return { kind: 'lurker', i };
+  for (let i = L.solids.length - 1; i >= 0; i--) if (inside(L.solids[i])) return { kind: 'solid', i };
+  return null;
+}
+function moveSel(s, x, y) { // x, y = new top-left for solids, new anchor point otherwise
+  if (s.kind === 'solid') Object.assign(L.solids[s.i], { x, y });
+  else if (s.kind === 'lurker') Object.assign(L.lurkers[s.i], { x, y });
+  else Object.assign(L[s.kind], { x, y });
+}
+const anchor = s => s.kind === 'solid' ? L.solids[s.i] : s.kind === 'lurker' ? L.lurkers[s.i] : L[s.kind];
+
+// ---- view ----
+function resize() { const d = devicePixelRatio || 1; cv.width = cv.clientWidth * d; cv.height = cv.clientHeight * d; }
+const toWorld = (sx, sy) => [sx / cam.z + cam.x, sy / cam.z + cam.y];
+function frame() {
+  const w = cv.clientWidth, h = cv.clientHeight; cam.z = Math.min(w / (L.width + 700), h / (L.height + 500));
+  cam.x = L.width / 2 - w / 2 / cam.z; cam.y = -150; $('zoomLbl').textContent = `zoom ${Math.round(cam.z * 100)}%`;
+}
+function setTool(t) { tool = t; document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === t)); cv.style.cursor = t === 'select' ? 'default' : 'crosshair'; }
+
+function draw() {
+  const d = devicePixelRatio || 1, z = cam.z;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#05090b'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.setTransform(z * d, 0, 0, z * d, -cam.x * z * d, -cam.y * z * d);
+  // water column, darker with depth
+  const g = ctx.createLinearGradient(0, 0, 0, L.height); g.addColorStop(0, '#163a48'); g.addColorStop(.4, '#0a1a20'); g.addColorStop(1, '#03080a');
+  ctx.fillStyle = g; ctx.fillRect(-300, 0, L.width + 600, L.height);
+  // grid: 100 px always, 10 px when zoomed in
+  const [x0, y0] = toWorld(0, 0), [x1, y1] = toWorld(cv.clientWidth, cv.clientHeight);
+  for (const step of z > 1.5 ? [10, 100] : [100]) {
+    ctx.strokeStyle = step === 100 ? 'rgba(122,152,168,.12)' : 'rgba(122,152,168,.05)'; ctx.lineWidth = 1 / z; ctx.beginPath();
+    for (let x = Math.floor(x0 / step) * step; x < x1; x += step) { ctx.moveTo(x, y0); ctx.lineTo(x, y1); }
+    for (let y = Math.floor(y0 / step) * step; y < y1; y += step) { ctx.moveTo(x0, y); ctx.lineTo(x1, y); }
+    ctx.stroke();
+  }
+  ctx.strokeStyle = '#7a98a8'; ctx.lineWidth = 2 / z; ctx.beginPath(); ctx.moveTo(-300, 0); ctx.lineTo(L.width + 300, 0); ctx.stroke(); // surface
+  ctx.setLineDash([8 / z, 6 / z]); ctx.strokeStyle = 'rgba(140,122,168,.5)'; ctx.beginPath(); ctx.moveTo(-300, L.height); ctx.lineTo(L.width + 300, L.height); ctx.stroke(); ctx.setLineDash([]);
+  for (const s of L.solids) { ctx.fillStyle = '#1b2a30'; ctx.fillRect(s.x, s.y, s.w, s.h); ctx.strokeStyle = '#3f5a64'; ctx.lineWidth = 1 / z; ctx.strokeRect(s.x, s.y, s.w, s.h); }
+  for (const l of L.lurkers) { // a lurker and its lure
+    ctx.fillStyle = '#5fbfa4'; ctx.beginPath(); ctx.ellipse(l.x, l.y, 20, 9, 0, 0, 6.283); ctx.fill();
+    ctx.fillStyle = '#cfe8df'; ctx.beginPath(); ctx.arc(l.x + 28, l.y - 20, 3, 0, 6.283); ctx.fill();
+  }
+  for (const k of Object.keys(MARKERS)) {
+    const b = box({ kind: k }), m = MARKERS[k];
+    ctx.fillStyle = m.color + '55'; ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeStyle = m.color; ctx.lineWidth = 2 / z; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    ctx.fillStyle = m.color; ctx.font = `${11 / z}px "IBM Plex Mono", monospace`; ctx.fillText(m.label, b.x, b.y - 4 / z);
+  }
+  if (sel) {
+    const b = box(sel); ctx.strokeStyle = '#e0cfa8'; ctx.lineWidth = 2 / z; ctx.strokeRect(b.x, b.y, b.w, b.h);
+    if (sel.kind === 'solid') for (const [hx, hy] of corners(b)) { ctx.fillStyle = '#e0cfa8'; ctx.fillRect(hx - 5 / z, hy - 5 / z, 10 / z, 10 / z); }
+  }
+  if (drag && drag.mode === 'rect') { const r = norm(drag); ctx.strokeStyle = '#e0cfa8'; ctx.setLineDash([6 / z, 4 / z]); ctx.strokeRect(r.x, r.y, r.w, r.h); ctx.setLineDash([]); }
+  // depth ruler on the left edge of the screen
+  ctx.setTransform(d, 0, 0, d, 0, 0); ctx.fillStyle = '#59666a'; ctx.font = '10px "IBM Plex Mono", monospace';
+  const stepM = z > .8 ? 10 : z > .3 ? 50 : 100;
+  for (let m = Math.max(0, Math.floor(y0 / 10 / stepM) * stepM); m * 10 < y1; m += stepM) { const sy = (m * 10 - cam.y) * z; ctx.fillRect(0, sy, 8, 1); ctx.fillText(m + ' m', 11, sy + 3); }
+}
+const corners = b => [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]];
+const norm = r => ({ x: Math.min(r.x0, r.x1), y: Math.min(r.y0, r.y1), w: Math.abs(r.x1 - r.x0), h: Math.abs(r.y1 - r.y0) });
+
+// ---- inspector ----
+function sync() {
+  $('lvName').value = L.name; $('lvWidth').value = L.width; $('lvHeight').value = Math.round(L.height / 10);
+  const has = !!sel; $('selGrid').hidden = !has; $('selNone').hidden = has;
+  if (has) {
+    const a = anchor(sel), solid = sel.kind === 'solid';
+    $('selTitle').textContent = solid ? 'Wall' : sel.kind === 'lurker' ? 'Lurker' : MARKERS[sel.kind].label;
+    $('sx').value = a.x; $('sy').value = a.y; $('sw').value = solid ? a.w : ''; $('sh').value = solid ? a.h : '';
+    $('sw').disabled = $('sh').disabled = !solid;
+  } else $('selTitle').textContent = 'Selection';
+  $('countLbl').textContent = `${L.solids.length} walls · ${L.lurkers.length} lurkers${dirty ? ' · unsaved' : ''}`;
+  $('snapLbl').textContent = snap ? 'snap on' : 'snap off';
+}
+for (const id of ['sx', 'sy', 'sw', 'sh']) $(id).addEventListener('change', e => {
+  if (!sel) return; const v = Math.round(+e.target.value); if (!isFinite(v)) return;
+  commit(); const a = anchor(sel), k = { sx: 'x', sy: 'y', sw: 'w', sh: 'h' }[id];
+  a[k] = k === 'w' || k === 'h' ? Math.max(4, v) : v; sync();
+});
+$('lvName').addEventListener('change', e => { commit(); L.name = e.target.value.slice(0, 80); sync(); });
+$('lvWidth').addEventListener('change', e => { const v = Math.round(+e.target.value); if (v >= 200) { commit(); L.width = v; } sync(); });
+$('lvHeight').addEventListener('change', e => { const v = Math.round(+e.target.value); if (v >= 20) { commit(); L.height = v * 10; } sync(); });
+
+// ---- mouse ----
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  const [wx, wy] = toWorld(e.offsetX, e.offsetY), sx = snapV(wx), sy = snapV(wy);
+  if (e.button === 1 || e.button === 2 || space) { drag = { mode: 'pan', sx: e.offsetX, sy: e.offsetY, cx: cam.x, cy: cam.y }; return; }
+  if (tool === 'select') {
+    if (sel && sel.kind === 'solid') { // grab a corner handle?
+      const b = box(sel), r = 8 / cam.z, c = corners(b).findIndex(([hx, hy]) => Math.abs(wx - hx) < r && Math.abs(wy - hy) < r);
+      if (c >= 0) { commit(); const [ox, oy] = corners(b)[3 - c]; drag = { mode: 'resize', ox, oy }; return; }
+    }
+    sel = hit(wx, wy); sync();
+    if (sel) { commit(); const a = anchor(sel); drag = { mode: 'move', dx: wx - a.x, dy: wy - a.y, moved: false }; }
+  } else if (tool === 'rect') drag = { mode: 'rect', x0: sx, y0: sy, x1: sx, y1: sy };
+  else if (tool === 'lurker') { commit(); L.lurkers.push({ x: sx, y: sy }); sel = { kind: 'lurker', i: L.lurkers.length - 1 }; drag = { mode: 'move', dx: 0, dy: 0 }; sync(); }
+  else { commit(); L[tool] = { x: sx, y: sy }; sel = { kind: tool }; drag = { mode: 'move', dx: 0, dy: 0 }; sync(); }
+});
+cv.addEventListener('pointermove', e => {
+  const [wx, wy] = toWorld(e.offsetX, e.offsetY); mouse = { x: e.offsetX, y: e.offsetY, wx, wy };
+  $('pos').textContent = `x ${Math.round(wx)} · y ${Math.round(wy)} · ${Math.max(0, Math.round(wy / 10))} m`;
+  if (!drag) return;
+  if (drag.mode === 'pan') { cam.x = drag.cx - (e.offsetX - drag.sx) / cam.z; cam.y = drag.cy - (e.offsetY - drag.sy) / cam.z; }
+  else if (drag.mode === 'move') { moveSel(sel, snapV(wx - drag.dx), snapV(wy - drag.dy)); sync(); }
+  else if (drag.mode === 'resize') { const r = norm({ x0: drag.ox, y0: drag.oy, x1: snapV(wx), y1: snapV(wy) }); Object.assign(L.solids[sel.i], { ...r, w: Math.max(4, r.w), h: Math.max(4, r.h) }); sync(); }
+  else if (drag.mode === 'rect') { drag.x1 = snapV(wx); drag.y1 = snapV(wy); }
+});
+cv.addEventListener('pointerup', () => {
+  if (drag && drag.mode === 'rect') { const r = norm(drag); if (r.w >= 4 && r.h >= 4) { commit(); L.solids.push(r); sel = { kind: 'solid', i: L.solids.length - 1 }; sync(); } }
+  drag = null;
+});
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const [wx, wy] = toWorld(e.offsetX, e.offsetY); cam.z = Math.min(6, Math.max(.05, cam.z * Math.pow(1.0015, -e.deltaY)));
+  cam.x = wx - e.offsetX / cam.z; cam.y = wy - e.offsetY / cam.z; $('zoomLbl').textContent = `zoom ${Math.round(cam.z * 100)}%`;
+}, { passive: false });
+
+// ---- keyboard ----
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+  if (mod && k === 's') { e.preventDefault(); save(); return; }
+  if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? history(redo, undo) : history(undo, redo); return; }
+  if (mod && k === 'y') { e.preventDefault(); history(redo, undo); return; }
+  if (mod && k === 'd' && sel && sel.kind === 'solid') { e.preventDefault(); commit(); const s = L.solids[sel.i]; L.solids.push({ ...s, x: s.x + 20, y: s.y + 20 }); sel = { kind: 'solid', i: L.solids.length - 1 }; sync(); return; }
+  if (e.key === ' ') { space = true; e.preventDefault(); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && sel && (sel.kind === 'solid' || sel.kind === 'lurker')) { commit(); L[sel.kind === 'solid' ? 'solids' : 'lurkers'].splice(sel.i, 1); sel = null; sync(); return; }
+  if (e.key.startsWith('Arrow') && sel) {
+    e.preventDefault(); commit(); const a = anchor(sel), n = e.shiftKey ? 10 : 1;
+    a.x += e.key === 'ArrowLeft' ? -n : e.key === 'ArrowRight' ? n : 0; a.y += e.key === 'ArrowUp' ? -n : e.key === 'ArrowDown' ? n : 0; sync(); return;
+  }
+  const tools = { v: 'select', r: 'rect', l: 'lurker', s: 'spawn', p: 'portal', e: 'emptyCrack' };
+  if (!mod && tools[k]) setTool(tools[k]);
+  if (!mod && k === 'g') { snap = !snap; sync(); }
+  if (!mod && k === 'f') frame();
+  if (e.key === 'Escape') { sel = null; sync(); }
+});
+addEventListener('keyup', e => { if (e.key === ' ') space = false; });
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => { setTool(b.dataset.tool); b.blur(); }));
+
+// ---- files ----
+const say = (text, err) => { $('msg').textContent = text; $('msg').className = err ? 'err' : ''; };
+async function listLevels(selectName) {
+  try {
+    const names = await (await fetch('/api/levels')).json();
+    $('levelSel').innerHTML = names.map(n => `<option>${n.replace(/[<>&]/g, '')}</option>`).join('');
+    if (selectName) $('levelSel').value = selectName;
+  } catch { say('No level server: run python3 serve.py and open this page from it.', true); }
+}
+async function openLevel(name) {
+  try {
+    const res = await fetch('levels/' + encodeURIComponent(name)); if (!res.ok) throw new Error(res.status);
+    L = await res.json(); file = name; sel = null; undo.length = redo.length = 0; dirty = false; frame(); sync(); say(`Opened ${name}`);
+  } catch (e) { say(`Could not open ${name}: ${e.message}`, true); }
+}
+async function save() {
+  try {
+    const res = await fetch('/api/levels/' + encodeURIComponent(file), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(L) });
+    if (!res.ok) throw new Error((await res.json()).error || res.status);
+    dirty = false; sync(); say(`Saved levels/${file}`); return true;
+  } catch (e) { say(`Save failed: ${e.message}. Is serve.py running?`, true); return false; }
+}
+async function play(fromView) { // a browser cannot launch the native game: save, then copy the command to run it
+  if (dirty && !(await save())) return;
+  let cmd = `./build/braindust levels/${file}`;
+  if (fromView) { const [cx, cy] = toWorld(cv.clientWidth / 2, cv.clientHeight / 2); cmd += ` --spawn ${Math.round(cx)},${Math.round(cy)}`; }
+  try { await navigator.clipboard.writeText(cmd); say(`Copied: ${cmd}`); }
+  catch { say(`Run: ${cmd}`); }
+}
+$('levelSel').addEventListener('change', e => { if (!dirty || confirm("Discard unsaved changes?")) openLevel(e.target.value); else e.target.value = file; });
+$('newBtn').addEventListener('click', async () => {
+  const n = ($('fileName').value.trim() || 'new-level').replace(/\.json$/, '');
+  if (!/^[A-Za-z0-9_-]{1,59}$/.test(n)) { say('File name: letters, digits, - and _ only.', true); return; }
+  L = blank(); file = n + '.json'; sel = null; undo.length = redo.length = 0; dirty = true; frame(); sync();
+  if (await save()) listLevels(file);
+});
+$('saveBtn').addEventListener('click', save);
+$('playBtn').addEventListener('click', () => play(false));
+$('playHereBtn').addEventListener('click', () => play(true));
+addEventListener('beforeunload', e => { if (dirty) e.preventDefault(); });
+
+addEventListener('resize', resize); resize();
+L = blank(); frame(); setTool('select'); sync();
+listLevels('abyss.json').then(() => openLevel($("levelSel").value || "abyss.json"));
+(function loop() { draw(); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>

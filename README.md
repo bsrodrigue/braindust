@@ -7,15 +7,15 @@ A 2D thalassophobia action game in raylib (C++). Design lives in `spec.md`; conc
 Needs a C++20 compiler, CMake and raylib 5.5 (Fedora: `sudo dnf install raylib-devel`; without it, CMake downloads and builds raylib).
 
 ```sh
-cmake -S port -B port/build -G Ninja && cmake --build port/build
-./port/build/braindust                      # levels/abyss.json
-./port/build/braindust levels/corpses.json  # The Sleeping Generation
-./port/build/braindust levels/shore.json    # The Shore of Kingdoms: platforming on land
+cmake -B build -G Ninja && cmake --build build
+./build/braindust                      # levels/abyss.json
+./build/braindust levels/corpses.json  # The Sleeping Generation
+./build/braindust levels/shore.json    # The Shore of Kingdoms: platforming on land
 ```
 
 Keyboard: arrows/WASD move (run on land, swim in the sea), Space jump / stroke up, ↓ dive, J wand, K star bolt, L flare, F (hold) focus, R restart.
 Gamepad: stick move, A stroke, X wand, Y bolt, B flare, RB focus.
-`F2`/`Tab` opens the tune menu: every gameplay variable, live (keyboard or mouse: click a row, drag a value, wheel scrolls, right-click resets; `S` or the Save button writes `port/tunables.json`). `F1` help, `M` mute, `F5` reloads the level and `port/tunables.json`.
+`F2`/`Tab` opens the tune menu: every gameplay variable, live (keyboard or mouse: click a row, drag a value, wheel scrolls, right-click resets; `S` or the Save button writes `tunables.json`). `F1` help, `M` mute, `F5` reloads the level, the character and `tunables.json`.
 `--spawn x,y` starts elsewhere; `--shot N file.png` renders N frames in a hidden window and saves the last one.
 
 ## Levels
@@ -45,12 +45,38 @@ Optional fields: `top` (negative: land and sky above the sea, y = 0 is the surfa
 
 `portal` and `emptyCrack` are crack centres; the 3D skulls are placed around them. `height` is the seafloor: the 3D graveyard and the depth gauge use it, so keep a floor wall there.
 
+## Characters
+
+`characters/mage.json` is the player. Swap the sheet by pointing `sheet`/`atlas` elsewhere; change the animation by editing `states` and `transitions`; `F5` reloads it.
+
+```json
+{
+ "sheet": "assets/player.png", "atlas": "assets/player.json",
+ "height": 96, "tint": "#dbe3e6",
+ "states": {
+  "run":    { "anim": "run", "fps": 6, "fpsParam": "runRatio", "fpsGain": 8 },
+  "strike": { "anim": "attack", "frames": [0, 1, 4, 5], "drive": "strike", "driveLength": 0.36 }
+ },
+ "transitions": [
+  { "from": "any", "to": "strike", "when": ["strike > 0"] },
+  { "from": "any", "to": "run", "when": ["!inWater", "speed > 30"] }
+ ]
+}
+```
+
+- `atlas`: the sheet layout (`cell`, `anchor` = feet, `anims {name: {row, frames, head}}`), as written by `tools/extract_player_sprites.py`.
+- `height`: world px from the feet to the top of the head in the first state's first frame (sets the sprite scale).
+- A state shows `frames` of one `anim` row (default: all). Looping at `fps + fpsGain × fpsParam`, or `drive`n by a countdown param going from `driveLength` to 0 (plays the frames once).
+- Each frame, transitions are tried in order; the first whose `when` conditions all hold wins (`from`: `any` or a state name; staying in the current state counts as a match). Conditions: `param`, `!param`, `param op number` with `> >= < <= == !=`.
+- Params the game sets: `strike`, `castHold` (countdowns, s), `flare`, `inWater`, `ground`, `focusing`, `hurt` (0/1), `vx`, `vy`, `speed` (|vx|), `runRatio` (|vx| / runSpeed). Add more in `World::animatePlayer` (`src/world.cpp`).
+
 ## Files
 
-- `port/`: the game (`src/`, `shaders/`, `tunables.json`).
+- `CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`: the game. `cmake --build build --target character_test && ./build/character_test` checks the mage's state machine.
+- `characters/*.json`: a character = a sprite sheet + an animation state machine (see below).
 - `levels/`: level files. `editor.html` + `serve.py`: the level editor.
 - `assets/*.blend`: Blender sources; `assets/*.glb`: what the game loads.
 - `assets/player.png` + `.json`: the player sprite, cut from the concept sheet in `docs/` by `python3 tools/extract_player_sprites.py` (needs Pillow).
-- `assets/tileset/`: PNGs from the Craftpix "World Tree Roots" pack (the zip next to it), toned down in game by `port/shaders/tile.fs`.
+- `assets/tileset/`: PNGs from the Craftpix "World Tree Roots" pack (the zip next to it), toned down in game by `shaders/tile.fs`.
 - `docs/`: concept art and lore sheets (inspiration, not canon).
 # braindust
