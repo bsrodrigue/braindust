@@ -46,7 +46,7 @@ A 2D action-exploration game about a black mage whose magic lives in his cranium
 ## 4. Character: the player
 
 - **Sprite:** the mage-warrior from the concept sheet `docs/Gemini_Generated_Image_l6z59hl6z59hl6z5.jpeg`: woven cranium wrapper, ivory wrapper armour, skull wand, carved spear, shield.
-- **Pipeline:** `python3 tools/extract_player_sprites.py` cuts the sheet (grey background removed, frame numbers and borders dropped, pieces spilling in from neighbouring cells removed, feet aligned on one baseline) into `assets/player.png` (254×212 cells: idle ×4, run ×6, attack ×6) and `assets/player.json` (cell, feet anchor, head position per frame). Re-run it if the sheet changes.
+- **Pipeline:** `python3 tools/extract_player_sprites.py` preserves the idle ×4 and attack ×6 rows and imports the eight transparent walking illustrations from `docs/Frame-Concepts/`. It normalizes their body height, aligns every frame at the feet and writes `assets/player.png` plus `assets/player.json` (cell, feet anchor, head position per frame). Pass the original concept sheet as an argument when idle or attack must be recut.
 - **In game:** 96 world px from feet to the top of the wrap (hitbox 28×70; the head rises above it), never rotated, mirrored for left; a cool tint (`#dbe3e6`) to sit in the water; red tint when hurt, flicker while invulnerable.
 - **Cranium:** as stardust rises it swells out of the top of the headwrap (per-frame head position), translucent and veined, with faint motes inside. It leaks stardust particles in proportion to stardust %.
 

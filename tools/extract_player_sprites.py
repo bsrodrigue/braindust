@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Cut the player sprite sheet (docs/, JPEG on a flat grey background) into a transparent atlas for the game.
+"""Build the player atlas from the concept sheet and separate walking frames.
 
     python3 tools/extract_player_sprites.py [sheet.jpeg]
 
 Writes assets/player.png (one row per animation, fixed cells, feet on a common baseline) and
 assets/player.json (cell size, anchor = feet centre, frame counts, head position per frame).
+
+Idle and attack are cut from the concept sheet. Walking frames are the transparent PNGs in
+docs/Frame-Concepts/walk-1.png ... walk-8.png; they are scaled to the existing character's
+body height before being aligned, so their larger source canvases do not change in-game scale.
 """
 import json
 import os
@@ -14,7 +18,10 @@ from collections import deque
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SHEET = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "docs", "Gemini_Generated_Image_l6z59hl6z59hl6z5.jpeg")
+SHEET = sys.argv[1] if len(sys.argv) > 1 else ""
+WALK_DIR = os.path.join(ROOT, "docs", "Frame-Concepts")
+ATLAS = os.path.join(ROOT, "assets", "player.png")
+ATLAS_META = os.path.join(ROOT, "assets", "player.json")
 BG = (199, 199, 199)
 WIDE = [25, 246, 467, 689, 912, 1133, 1352]
 ROWS = {  # cell borders measured on the sheet: (top, bottom, column edges)
@@ -109,16 +116,68 @@ def anchor_and_head(frame):
     return fx, bottom, sum(head) / len(head), htop
 
 
-def main():
-    sheet = Image.open(SHEET).convert("RGB")
+def walk_anchor_and_head(frame):
+    """Feet/head landmarks for the separate frames, ignoring the long trailing braids."""
+    a = frame.getchannel("A").load()
+    w, h = frame.size
+    # The body occupies the right-hand side of every source frame. The left side is hair and
+    # flowing cloth, which must remain visible but must not pull the feet anchor away from the body.
+    body_x = int(w * .43)
+    points = [(x, y) for y in range(h) for x in range(body_x, w) if a[x, y] > 24]
+    top, bottom = min(y for _, y in points), max(y for _, y in points)
+    lower = [(x, y) for x, y in points if y >= top + (bottom - top) * .58]
+    fx = sum(x for x, _ in lower) / len(lower)
+    head_band = [(x, y) for x, y in points if y <= top + 14]
+    hx = sum(x for x, _ in head_band) / len(head_band)
+    return fx, bottom, hx, top
+
+
+def walking_frames(target_height=190):
+    """Load and normalize the eight already-transparent walking illustrations."""
+    out = []
+    for i in range(1, 9):
+        frame = Image.open(os.path.join(WALK_DIR, f"walk-{i}.png")).convert("RGBA")
+        _, bottom, _, top = walk_anchor_and_head(frame)
+        scale = target_height / (bottom - top)
+        frame = frame.resize((round(frame.width * scale), round(frame.height * scale)), Image.Resampling.LANCZOS)
+        out.append(frame)
+    return out
+
+
+def existing_frames():
+    """Read idle/attack back from the current atlas when their original sheet is unavailable."""
+    with open(ATLAS_META) as fh:
+        meta = json.load(fh)
+    atlas = Image.open(ATLAS).convert("RGBA")
+    cw, ch = meta["cell"]
     frames = {}
-    for name, (y0, y1, xs) in ROWS.items():
+    for name in ("idle", "attack"):
+        anim = meta["anims"][name]
+        row = anim["row"]
         frames[name] = []
-        for x0, x1 in zip(xs, xs[1:]):
-            cell = sheet.crop((x0 + 4, y0 + 4, x1 - 3, y1 - 3))
-            frames[name].append(cut(cell))
+        for i in range(anim["frames"]):
+            frame = atlas.crop((i * cw, row * ch, (i + 1) * cw, (row + 1) * ch))
+            frames[name].append(frame.crop(frame.getchannel("A").getbbox()))
+    return frames
+
+
+def main():
+    if SHEET:
+        sheet = Image.open(SHEET).convert("RGB")
+        frames = {}
+        for name, (y0, y1, xs) in ROWS.items():
+            frames[name] = []
+            for x0, x1 in zip(xs, xs[1:]):
+                cell = sheet.crop((x0 + 4, y0 + 4, x1 - 3, y1 - 3))
+                frames[name].append(cut(cell))
+    else:
+        frames = existing_frames()
+    frames["run"] = walking_frames()
+    # Keep the established row order consumed by characters/mage.json and existing metadata.
+    frames = {name: frames[name] for name in ("idle", "run", "attack")}
     # one cell size for all frames, anchored at the feet
-    info = {n: [anchor_and_head(f) for f in fs] for n, fs in frames.items()}
+    info = {n: [(walk_anchor_and_head(f) if n == "run" else anchor_and_head(f)) for f in fs]
+            for n, fs in frames.items()}
     left = max(fx for n in info for (fx, _, _, _) in info[n])
     right = max(f.size[0] - fx for n in frames for f, (fx, _, _, _) in zip(frames[n], info[n]))
     up = max(by for n in info for (_, by, _, _) in info[n])

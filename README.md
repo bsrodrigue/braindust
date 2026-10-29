@@ -101,7 +101,7 @@ Gameplay content is data: every entry is a set of named numbers and strings, edi
 - `characters/*.json`: a character = a sprite sheet + an animation state machine (see below).
 - `levels/`: level files. `editor.html` + `serve.py`: the level editor.
 - `assets/*.blend`: Blender sources; `assets/*.glb`: what the game loads.
-- `assets/player.png` + `.json`: the player sprite, cut from the concept sheet in `docs/` by `python3 tools/extract_player_sprites.py` (needs Pillow).
+- `assets/player.png` + `.json`: the player sprite atlas, rebuilt by `python3 tools/extract_player_sprites.py` (needs Pillow). Idle and attack come from the existing atlas or an optional concept-sheet argument; the eight run frames come from `docs/Frame-Concepts/walk-1.png` through `walk-8.png`.
 - `assets/tileset/`: PNGs from the Craftpix "World Tree Roots" pack (the zip next to it), toned down in game by `shaders/tile.fs`.
 - `docs/`: concept art and lore sheets (inspiration, not canon).
 # braindust
