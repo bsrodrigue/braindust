@@ -18,7 +18,6 @@
  "focusCost": 33.0,
  "focusHeal": 25.0,
  "focusTime": 0.9,
- "dustPerBlood": 0.3,
  "dustPower": 1.5,
  "dustDecay": 0.0,
  "pressureDepth": 300.0,

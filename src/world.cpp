@@ -33,7 +33,7 @@ template <class Body> void moveBody(Body& b, const std::vector<Box>& solids, flo
 void applyBonus(Tunables& t, const std::string& kind) {  // lore: wrappers protect the cranium and grant bonuses
   if (kind == "focus") t.focusTime *= .6f;
   else if (kind == "protection") t.maxHp += 25;
-  else if (kind == "dust") t.dustPerBlood *= .6f;
+  else if (kind == "dust") t.pressure *= .6f;
   else t.manaRegen += 3;
 }
 
@@ -138,21 +138,6 @@ void World::die(const char* why) {
   outcome = Outcome::Dead; msg = why;
   burst(player.x + player.w / 2, player.y, 60, hex("#8c7aa8"), 200, -30, 2);
   audio.thump(1);
-}
-
-// the core mechanic: mana first, then blood (bloodRatio HP per missing mana point); blood turns the brain to stardust
-void World::pay(float cost, float bloodRatio) {
-  Player& P = player;
-  float m = std::min(P.mana, cost), owed = cost - m;
-  P.mana -= m;
-  if (owed <= 0) return;
-  P.hp -= owed * bloodRatio;
-  P.dust = std::min(100.f, P.dust + owed * tun.dustPerBlood);
-  P.bleed = .4f;
-  burst(P.x + P.w / 2, P.y + P.h * .3f, 18, hex("#5e1019"), 120, 40, 1.2f);
-  audio.hiss(300, 80, .45f, .4f);
-  if (P.hp <= 0) die("You fed on the last of your blood.");
-  else if (P.dust >= 100) die("Your mind scattered into the dark water.");
 }
 
 // the enemy type's "resist.<damage type>" multiplies the damage: 0 is immune (a dry glance, so you try something
@@ -341,7 +326,7 @@ void World::updateBody(float dt) {
       if (overlaps(boxOf(P), z.r)) { P.dust = std::min(100.f, P.dust + z.rate * dt); warpTarget = 1; }
   warp += (warpTarget - warp) * std::min(1.f, dt * 2);
   if (P.dust >= 100) { die("The deep crushed your mind into stars."); return; }
-  for (float* k : {&P.inv, &P.bleed, &P.strokeCd, &P.flare, &P.portalCd, &P.parry}) *k -= dt;
+  for (float* k : {&P.inv, &P.strokeCd, &P.flare, &P.portalCd, &P.parry}) *k -= dt;
   P.cooldowns.tick(dt);
   P.anims.tick(dt);
   if (P.inWater && frand() < dt * 1.5f) particles.push_back({P.x + P.w / 2 + 6.f * P.face, headY() + 14, 0, 0, -60, 1.5f, 1.5f, hex("#8fa6ae"), 1.5f});
@@ -353,7 +338,7 @@ void World::updateBody(float dt) {
 }
 
 // a move may start when its group is off cooldown, the medium fits ("any", "water", "land", "ground", "air"),
-// and a leap has charges left. Spells ("mana" > 0) are always allowed: what you lack is paid in blood.
+// and a leap has charges left. A spell starts only when its full mana cost is available.
 bool World::moveAllowed(const Record& m) const {
   const Player& P = player;
   if (P.cooldowns.get(m.str("group", m.name)) > 0) return false;
@@ -361,6 +346,7 @@ bool World::moveAllowed(const Record& m) const {
   bool air = !P.inWater && !P.ground && P.coyote <= 0 && !P.jumped;
   if ((md == "water" && !P.inWater) || (md == "land" && P.inWater) || (md == "air" && !air) || (md == "ground" && (P.inWater || !P.ground)))
     return false;
+  if (m.num("mana") > P.mana) return false;
   return m.str("kind") != "leap" || P.leaps > 0;
 }
 
@@ -382,7 +368,7 @@ void World::useMoves(float dt, const Input& in) {
     float hold = m.num("hold");
     if (hold <= 0) {
       if (in.tap(a) && moveAllowed(m)) doMove(i);
-      if (outcome != Outcome::Playing) return;  // a spell paid with the last of your blood
+      if (outcome != Outcome::Playing) return;
       continue;
     }
     if (in.held(a) && P.holdT[a] < hold && P.holdT[a] + dt >= hold) {  // charged: a glint at the spear tip
@@ -405,10 +391,7 @@ void World::doMove(int i) {
   P.cooldowns[m.str("group", m.name)] = m.num("cooldown");
   if (m.has("anim")) P.anims[m.str("anim")] = m.num("animTime", .3f);
   makeNoise(m.num("noise", .5f));
-  if (cost > 0) {
-    pay(cost, m.num("bloodRatio", 1.2f));
-    if (outcome != Outcome::Playing) return;
-  }
+  if (cost > 0) P.mana -= cost;
   float dmg = m.num("damage") * (cost > 0 ? power() : 1);  // stardust strengthens spells, not the spear
   if (kind == "melee") {
     float reach = m.num("reach", 70), hh = m.num("height", P.h);
@@ -433,7 +416,7 @@ void World::doMove(int i) {
     float r = m.num("radius", 170);
     for (auto& e : enemies)
       if (e.alive && std::hypot(e.x + e.w / 2 - cx, e.y + e.h / 2 - cy) < r) damage(e, dmg, type, (e.x > P.x) ? 1.f : -1.f);
-  } else if (kind == "leap") {  // magic as movement: a second jump in the air, drawn from mana (or blood)
+  } else if (kind == "leap") {  // magic as movement: a second jump in the air, drawn from mana
     P.leaps--; P.vy = -m.num("speed", 720); P.jumping = true; P.jumpBuf = 0;
     burst(cx, P.y + P.h, 18, hex("#8c7aa8"), 120, 60, .7f);
     audio.hiss(1800, 400, .35f, .12f);

@@ -4,7 +4,7 @@
 
 // Body, movement, light and stardust rules. Spells, physical moves, enemies and items live in data/*.json.
 struct Tunables {
-  float maxHp = 100, maxMana = 100, manaRegen = 3, dustPerBlood = .3f, dustPower = 1.5f, dustDecay = 0, lightBase = 160, dustLight = 2.5f,
+  float maxHp = 100, maxMana = 100, manaRegen = 3, dustPower = 1.5f, dustDecay = 0, lightBase = 160, dustLight = 2.5f,
         focusCost = 33, focusHeal = 25, focusTime = .9f, pressureDepth = 300, pressure = .15f, swim = 200, stroke = 260, sink = 180,
         // land: weighty, Blasphemous-like jump: fast rise, heavier fall, committed air control
         runSpeed = 230, groundAccel = 18, airControl = .35f, jump = 780, landGravity = 2800, fallGravity = 4600, maxFall = 1150,
@@ -22,9 +22,8 @@ inline const TunableField TUNABLE_FIELDS[] = {
     {"maxHp", &Tunables::maxHp, 5, "Body"}, {"maxMana", &Tunables::maxMana, 5, "Body"}, {"manaRegen", &Tunables::manaRegen, .5f, "Body"},
     {"focusCost", &Tunables::focusCost, 1, "Body"},
     {"focusHeal", &Tunables::focusHeal, 1, "Body"}, {"focusTime", &Tunables::focusTime, .05f, "Body"},
-    {"dustPerBlood", &Tunables::dustPerBlood, .05f, "Blood & stardust"},
-    {"dustPower", &Tunables::dustPower, .1f, "Blood & stardust"}, {"dustDecay", &Tunables::dustDecay, .05f, "Blood & stardust"},
-    {"pressureDepth", &Tunables::pressureDepth, 10, "Blood & stardust"}, {"pressure", &Tunables::pressure, .01f, "Blood & stardust"},
+    {"dustPower", &Tunables::dustPower, .1f, "Stardust"}, {"dustDecay", &Tunables::dustDecay, .05f, "Stardust"},
+    {"pressureDepth", &Tunables::pressureDepth, 10, "Stardust"}, {"pressure", &Tunables::pressure, .01f, "Stardust"},
     {"lightBase", &Tunables::lightBase, 10, "Light"}, {"dustLight", &Tunables::dustLight, .1f, "Light"}};
 
 Tunables loadTunables(const std::string& path);  // defaults for anything missing; a bad file only warns

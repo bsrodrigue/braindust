@@ -36,7 +36,7 @@ struct Player {
   bool ground = false, focusing = false, inWater = true, jumping = false, jumped = false;  // jumped: this frame
   float hp = 0, mana = 0, dust = 0, focus = 0;  // dust: stardust %, the brain turning to stars
   // countdowns (s)
-  float coyote = 0, jumpBuf = 0, inv = 0, kb = 0, bleed = 0, strokeCd = 0, portalCd = 0;
+  float coyote = 0, jumpBuf = 0, inv = 0, kb = 0, strokeCd = 0, portalCd = 0;
   float flare = 0, flareLight = 0;           // the light of the last burst, while it lasts
   float dash = 0, dashDir = 0, dashSpeed = 0;  // a dodge in progress
   float parry = 0;                           // the parry window
@@ -110,7 +110,7 @@ class World {
   float lightR() const;
   bool lit(float x, float y) const;  // inside your light
   bool seen(float x, float y, float reveal) const;  // a pickup with this "reveal" (see level.hpp) shows here
-  float cheapestSpell() const;       // the lowest mana cost of a spell: below it, casting draws blood
+  float cheapestSpell() const;       // the lowest mana cost of a spell: below it, no spell can start
   int depthM() const;
   bool solidAt(float x, float y) const;
   Vector2 portalCentre() const { return {cracks[0].r.x + 30, cracks[0].r.y + 40}; }
@@ -140,7 +140,6 @@ class World {
   void enterPocket();
   void leavePocket();
   void die(const char* why);
-  void pay(float cost, float bloodRatio);
   bool damage(Enemy& e, float d, const std::string& type, float dir, float knockback = 220);  // false: no effect
   void hurt(float d, float dir);
   void parried(Enemy& e);

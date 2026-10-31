@@ -1,4 +1,4 @@
-// HUD: mana vessel, blood and stardust bars, depth gauge, banners, death/win screen, help. HUD units (see ui.hpp).
+// HUD: mana vessel, health and stardust bars, depth gauge, banners, death/win screen, help. HUD units (see ui.hpp).
 #include <algorithm>
 #include <cmath>
 
@@ -11,14 +11,14 @@ void Renderer::drawHud(const World& w) {
   const float S = ui.S, VW = ui.VW, VH = ui.VH, t = w.t;
   bool playing = w.outcome == Outcome::Playing;
   float x = 22, y = 22, r = 22, vx = x + r, vy = y + r;
-  bool blood = P.mana < w.cheapestSpell();
+  bool manaDry = P.mana < w.cheapestSpell();
   DrawCircleV({vx * S, vy * S}, r * S, hex("#030607"));
   float f = P.mana / C.maxMana;  // mana vessel, filled from the bottom
   for (float yy = vy + r - f * 2 * r; yy < vy + r; yy += 1 / S) {
     float half = std::sqrt(std::max(0.f, r * r - (yy - vy) * (yy - vy)));
     DrawRectangleV({(vx - half) * S, yy * S}, {half * 2 * S, 1.2f}, hex("#4d6a78"));
   }
-  DrawRing({vx * S, vy * S}, (r - 1) * S, (r + 1) * S, 0, 360, 48, blood ? hex("#8e1f2b", .6f + .4f * std::sin(t * 6)) : hex("#5e4c30"));
+  DrawRing({vx * S, vy * S}, (r - 1) * S, (r + 1) * S, 0, 360, 48, manaDry ? hex("#8f7448", .6f + .4f * std::sin(t * 6)) : hex("#5e4c30"));
   if (P.focus > 0) DrawRing({vx * S, vy * S}, (r + 3) * S, (r + 5) * S, -90, -90 + 360 * P.focus / C.focusTime, 48, hex("#7a98a8"));
   // carried items: one flask per item, under the vessel
   for (size_t i = 0, n = 0; i < P.items.size(); i++)
@@ -30,14 +30,14 @@ void Renderer::drawHud(const World& w) {
     }
   float bx = vx + r + 12, bw = 170;
   DrawRectangleV({bx * S, (y + 6) * S}, {bw * S, 8 * S}, hex("#100506"));
-  DrawRectangleV({bx * S, (y + 6) * S}, {bw * S * std::max(0.f, P.hp) / C.maxHp, 8 * S}, P.bleed > 0 ? hex("#b8323f") : hex("#6e1a22"));
+  DrawRectangleV({bx * S, (y + 6) * S}, {bw * S * std::max(0.f, P.hp) / C.maxHp, 8 * S}, P.kb > 0 ? hex("#b8323f") : hex("#6e1a22"));
   DrawRectangleV({bx * S, (y + 20) * S}, {bw * S, 4 * S}, hex("#0b0910"));
   DrawRectangleGradientH(int(bx * S), int((y + 20) * S), int(bw * S * P.dust / 100), int(4 * S), hex("#5a4f6a"), hex("#8f7448"));
   ui.text(TextFormat("%d", std::max(0, int(std::ceil(P.hp)))), bx + bw + 8, y + 4, 10, hex("#59666a"));
   ui.text(TextFormat("stardust %d%%  |  power x%.2f  |  sight %d", int(P.dust), w.power(), int(w.lightR())), bx, y + 30, 10, hex("#59666a"));
   if (!w.inPocket && w.warp > .3f && playing) ui.text("a mage's mind burst here: the dust is in you", bx, y + 44, 10, hex("#8c7aa8"));
   else if (!w.inPocket && w.depthM() > C.pressureDepth && playing) ui.text("the deep presses on your skull", bx, y + 44, 10, hex("#6d5f80"));
-  else if (blood && playing) ui.text("mana dry: spells will drink blood", bx, y + 44, 10, hex("#8e1f2b"));
+  else if (manaDry && playing) ui.text("mana dry: recover mana to cast", bx, y + 44, 10, hex("#8f7448"));
   if (!w.inPocket) {  // depth gauge; the pressure zone below pressureDepth is tinted
     float gx = VW - 34, gy = 70, gh = std::min(260.f, VH - 160), my = gy + gh * std::min(1.f, P.y / w.H);
     DrawRectangleV({gx * S, gy * S}, {2 * S, gh * S}, hex("#ffffff", .05f));
@@ -66,14 +66,14 @@ void Renderer::drawHelp(bool touch) {
   if (touch) {
     const char* lines[] = {"Left thumb: move (push down to dive)      JUMP: jump / stroke up, again in the air: star leap",
                            "WAND (hold and let go: thrust)   BOLT   FLARE   DODGE   PARRY   FOCUS (hold)   VIAL",
-                           "Spells you cannot afford drink blood.      The button at the top right pauses.",
+                           "Spells require enough mana.      The button at the top right pauses.",
                            "Tap to close"};
     for (int i = 0; i < 4; i++) ui.text(lines[i], ui.VW / 2, ui.VH * .36f + i * 20, 12, hex("#b9c2c4"), false, true);
     return;
   }
   const char* lines[] = {"Arrows / WASD  move      Space  jump / stroke up (in the air: star leap)      Down  dive",
                          "J  wand (+mana; hold and release: thrust)      Shift  dodge      U  parry      Q  dust vial",
-                         "K  star bolt      L  flare      F (hold)  focus      spells you cannot afford drink blood",
+                         "K  star bolt      L  flare      F (hold)  focus      spells require enough mana",
                          "Esc  menu   R  restart   M  mute   F2  tune pages   F5  reload level, data, character + tunables   F1  help",
                          "Gamepad: stick move, A jump, X wand, Y bolt, B flare, RB focus, RT dodge, LB parry, D-pad up vial"};
   for (int i = 0; i < 5; i++) ui.text(lines[i], ui.VW / 2, ui.VH * .36f + i * 20, 12, hex("#b9c2c4"), false, true);

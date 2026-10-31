@@ -1,4 +1,4 @@
-// The rules behind data/*.json: blood costs, moves, senses, resistances, parry, seals, items and hidden pickups.
+// The rules behind data/*.json: mana costs, moves, senses, resistances, parry, seals, items and hidden pickups.
 // Expected values come from the data files, so tuning them keeps this passing. Run from the project root:
 // ./build/gameplay_test
 #undef NDEBUG  // asserts must run in Release builds too
@@ -36,15 +36,15 @@ const Record& move(const char* name) { return content.moves.list[content.moves.f
 const Record& enemy(const char* name) { return content.enemies.list[content.enemies.find(name)]; }
 bool near(float a, float b, float eps = 1e-3f) { return std::fabs(a - b) < eps; }
 
-void bloodCost() {  // what mana cannot pay is paid in blood, at the spell's own rate, and turns to stardust
+void insufficientManaBlocksSpell() {  // a spell cannot start without its full mana cost
   Game g;
   const Record& bolt = move("bolt");
   g.P().mana = 10;
-  float mana = 10 + g.w.tun.manaRegen * DT, owed = bolt.num("mana") - mana;
+  float mana = 10 + g.w.tun.manaRegen * DT;
   g.frame({A_BOLT});
-  assert(near(g.P().hp, g.w.tun.maxHp - owed * bolt.num("bloodRatio")));
-  assert(near(g.P().dust, owed * g.w.tun.dustPerBlood));
-  assert(g.P().mana == 0 && g.w.shots.size() == 1);
+  assert(near(g.P().hp, g.w.tun.maxHp));
+  assert(near(g.P().dust, 0));
+  assert(near(g.P().mana, mana) && g.w.shots.empty());
 }
 
 void resistances() {  // the isopod's shell turns the wand (immune: no damage, no mana); a lurker takes it
@@ -212,7 +212,7 @@ void badData() {  // malformed files fail with an error instead of reading garba
 int main() {
   SetTraceLogLevel(LOG_WARNING);
   content = loadContent("data");
-  bloodCost();
+  insufficientManaBlocksSpell();
   resistances();
   thrust();
   leap();

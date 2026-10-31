@@ -1,11 +1,11 @@
 {
  "sheet": "assets/player.png",
  "atlas": "assets/player.json",
- "height": 96,
+ "height": 116,
  "tint": "#dbe3e6",
  "states": {
-  "idle":   { "anim": "idle", "fps": 4 },
-  "drift":  { "anim": "idle", "fps": 2.5 },
+  "idle":   { "anim": "run", "frames": [0] },
+  "drift":  { "anim": "run", "frames": [0] },
   "run":    { "anim": "run", "fps": 6, "fpsParam": "runRatio", "fpsGain": 8 },
   "rise":   { "anim": "run", "frames": [1] },
   "fall":   { "anim": "run", "frames": [3] },

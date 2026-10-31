@@ -64,7 +64,7 @@ Optional fields: `enemies [{type, x,y}]` (any entry of `data/enemies.json`; `lur
 
 Gameplay content is data: every entry is a set of named numbers and strings, edited live on the F2 pages and saved back by them (nesting one level deep shows as `resist.slash`). Code reads each field by name with a default.
 
-- `data/moves.json`: what the player can do. `input` (`staff bolt flare up dodge parry`), `kind` (`melee projectile burst leap dash parry`), `medium` (`any water land ground air`), `mana` (spells: what mana cannot pay is paid in blood at `bloodRatio` HP per point, and turns to stardust), `damage`, `damageType` (`slash pierce star light`), `cooldown` per `group`, `hold` (fires on release after holding that long: the thrust), `anim`/`animTime` (a countdown the character's state machine reads), `noise` (what listeners hear), plus per-kind fields (`reach`, `manaGain`, `knockback`, `lunge`, `speed`, `life`, `radius`, `light`, `time`, `charges`, `invuln`, `waterScale`, `window`, `stun`).
+- `data/moves.json`: what the player can do. `input` (`staff bolt flare up dodge parry`), `kind` (`melee projectile burst leap dash parry`), `medium` (`any water land ground air`), `mana` (a spell requires its full mana cost and does not fire when mana is short), `damage`, `damageType` (`slash pierce star light`), `cooldown` per `group`, `hold` (fires on release after holding that long: the thrust), `anim`/`animTime` (a countdown the character's state machine reads), `noise` (what listeners hear), plus per-kind fields (`reach`, `manaGain`, `knockback`, `lunge`, `speed`, `life`, `radius`, `light`, `time`, `charges`, `invuln`, `waterScale`, `window`, `stun`).
 - `data/enemies.json`: `behaviour` (`stalker`: drift, stalk, lunge, recover; `chaser`: comes straight at you), `sense` (`light`: `sight` × your light radius, × `flareLure` while a flare burns; `noise`: `sight` × how loud you have been; `dust`: `sight` px per stardust %; `fixed`: `sight` px), `draw` (`lurker thought jelly isopod leech`), `hp`, `w`, `h`, `contactDamage`, `contactDust`, `speed`, the stalker's distances and lunge, `respawn`, and `resist.<damageType>`: a damage multiplier. 0 is immune (a dry glance and spark), below 0 it heals the enemy (up to twice its health), above 1 is a weak spot.
 - `data/items.json`: carried consumables (`max`), used with their `input`: `mana`, `heal`, `dust` (the dust vial is a stardust drug: mana now, mind later), `title`/`line` for the pickup banner.
 
@@ -75,7 +75,7 @@ Gameplay content is data: every entry is a set of named numbers and strings, edi
 ```json
 {
  "sheet": "assets/player.png", "atlas": "assets/player.json",
- "height": 96, "tint": "#dbe3e6",
+ "height": 116, "tint": "#dbe3e6",
  "states": {
   "run":    { "anim": "run", "fps": 6, "fpsParam": "runRatio", "fpsGain": 8 },
   "strike": { "anim": "attack", "frames": [0, 1, 4, 5], "drive": "strike", "driveLength": 0.36 }
@@ -95,7 +95,7 @@ Gameplay content is data: every entry is a set of named numbers and strings, edi
 
 ## Files
 
-- `CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`, `data/`: the game. Tests, run from the project root: `cmake --build build --target character_test collision_test gameplay_test platform_test`, then `./build/character_test` (the mage's state machine), `./build/collision_test` (bodies stop at the nearest face where solids overlap; tuning keeps the wrapper bonuses), `./build/gameplay_test` (blood costs, moves, senses, resistances, parry, seals, items, saving data; expected values come from `data/`, so tuning keeps it passing), `./build/platform_test` (touch controls, the GLSL ES rewrite).
+- `CMakeLists.txt`, `src/`, `shaders/`, `tunables.json`, `data/`: the game. Tests, run from the project root: `cmake --build build --target character_test collision_test gameplay_test platform_test`, then `./build/character_test` (the mage's state machine), `./build/collision_test` (bodies stop at the nearest face where solids overlap; tuning keeps the wrapper bonuses), `./build/gameplay_test` (mana costs, moves, senses, resistances, parry, seals, items, saving data; expected values come from `data/`, so tuning keeps it passing), `./build/platform_test` (touch controls, the GLSL ES rewrite).
 - `android/`: the Android build (Gradle; NativeActivity, no Java). `src/platform.*`: what differs on Android (files, shaders, `--scale`); `src/touch.*`: on-screen controls; `src/menu.*`: the pause menu.
 - `assets/fonts/`: DejaVu Sans Mono and DejaVu Serif (license next to them), used where the system has no fonts of its own (Android).
 - `characters/*.json`: a character = a sprite sheet + an animation state machine (see below).
@@ -103,5 +103,5 @@ Gameplay content is data: every entry is a set of named numbers and strings, edi
 - `assets/*.blend`: Blender sources; `assets/*.glb`: what the game loads.
 - `assets/player.png` + `.json`: the player sprite atlas, rebuilt by `python3 tools/extract_player_sprites.py` (needs Pillow). Idle and attack come from the existing atlas or an optional concept-sheet argument; the eight run frames come from `docs/Frame-Concepts/walk-1.png` through `walk-8.png`.
 - `assets/tileset/`: PNGs from the Craftpix "World Tree Roots" pack (the zip next to it), toned down in game by `shaders/tile.fs`.
-- `docs/`: concept art and lore sheets (inspiration, not canon).
+- `docs/`: concept art, animation sources and rigging references. [`docs/README.md`](docs/README.md) is the art-library manifest: canonical direction, biome briefs and asset status.
 # braindust

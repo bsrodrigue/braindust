@@ -1,10 +1,10 @@
 # Braindust — Game Specification
 
-Living document. Updated as prototypes change. Last update: 2026-10-28.
+Living document. Updated as prototypes change. Last update: 2026-10-29.
 
 ## 1. Vision
 
-A 2D action-exploration game about a black mage whose magic lives in his cranium. Spending magic beyond your means costs blood, and blood-casting turns the brain into stardust. Set in an ocean of thalassophobia and cosmic horror: giant skulls on the seafloor, universes inside their cracks, things that escaped from minds.
+A 2D action-exploration game about a warrior-mage whose magic lives in their cranium. Magic spends mana; stardust is the dangerous residue of broken minds, the deep, and forbidden drugs. Set in an ocean of thalassophobia and cosmic horror: giant skulls on the seafloor, universes inside their cracks, things that escaped from minds.
 
 **World:** a set of **areas**, each its own **biome** (see 7b). The sea is the first; a lake of blood and, late in the game, a crocodile swamp follow.
 
@@ -16,6 +16,14 @@ A 2D action-exploration game about a black mage whose magic lives in his cranium
 - Theory crafting (helmets, wands, risk budgets)
 - Deep lore, discovered rather than explained
 - Real thalassophobia: scale, darkness, sound, things you only half see
+
+### 1.1 Combat, people and the overworld
+
+Combat is a pillar, not the only verb. A sentient being is not automatically an enemy: every fight needs an intelligible in-world reason—immediate danger, a creature acting on an established hunger or curse, self-defence, a territorial threat, or a consciously hostile faction. The game should not turn every encounter with a person-shaped creature into an unexplained killing.
+
+Use non-hostile overworld spaces to vary the emotional rhythm: fishing villages, coastal paths, pilgrim or monk sites, ruins where people still work, traders, witnesses and travellers. These spaces can carry conversation, optional lore, preparation, route choice and the consequences of what happened in hostile areas. They make descent into the abyss feel chosen and threatening rather than like an uninterrupted corridor of combat.
+
+The Crocos remain a deliberate exception: they are hostile horror creatures, not a people the player meets for quests or diplomacy. Other tribes, kingdoms and mages remain open design space; when introduced, they should have motives, lives and interactions beyond combat.
 
 ## 2. Format decisions
 
@@ -33,8 +41,8 @@ A 2D action-exploration game about a black mage whose magic lives in his cranium
 - Light is scarce and diegetic: the cranium, spells, lures, the universe in the giant skull.
 - Film grain, heavy vignette, near-black at depth.
 - Palette (abyss): void `#010204`, ink `#b9c2c4`, tarnished brass `#8f7448`, mana `#7a98a8`, blood `#8e1f2b`, stardust `#8c7aa8`.
-- Reference: `docs/Gemini_Generated_Image_bzuxnnbzuxnnbzux.jpeg` (tiny diver, giant cracked skull with a galaxy inside, bone field).
-- Each biome has its own palette and references (7b); this palette is the sea's. Concept art in `docs/` and `docs/Concept-Arts/` is inspiration, not canon.
+- Reference: `docs/Concept-Arts/Gemini_Generated_Image_bzuxnnbzuxnnbzux.jpeg` (tiny diver, giant cracked skull with a galaxy inside, bone field).
+- Each biome has its own palette and references (7b); this palette is the sea's. See `docs/README.md` for the art-library manifest and canonical directions. Concept art is inspiration unless explicitly marked as a production source.
 
 ## 3b. Tileset (land)
 
@@ -45,25 +53,47 @@ A 2D action-exploration game about a black mage whose magic lives in his cranium
 
 ## 4. Character: the player
 
-- **Sprite:** the mage-warrior from the concept sheet `docs/Gemini_Generated_Image_l6z59hl6z59hl6z5.jpeg`: woven cranium wrapper, ivory wrapper armour, skull wand, carved spear, shield.
+- **Canonical direction:** the braided African warrior-mage in `docs/Frame-Concepts/`: four near-ground woven braids, an ivory African-inspired wrapper/headdress, layered light cloth, sash and tarnished-gold ornaments. The game uses a polished hand-painted three-quarter side view, facing right. The weapon/combat silhouette remains an implementation detail until its replacement art is made; the current atlas still contains older idle and attack art.
 - **Pipeline:** `python3 tools/extract_player_sprites.py` preserves the idle ×4 and attack ×6 rows and imports the eight transparent walking illustrations from `docs/Frame-Concepts/`. It normalizes their body height, aligns every frame at the feet and writes `assets/player.png` plus `assets/player.json` (cell, feet anchor, head position per frame). Pass the original concept sheet as an argument when idle or attack must be recut.
-- **In game:** 96 world px from feet to the top of the wrap (hitbox 28×70; the head rises above it), never rotated, mirrored for left; a cool tint (`#dbe3e6`) to sit in the water; red tint when hurt, flicker while invulnerable.
+- **In game:** 116 world px from feet to the top of the wrap (hitbox 28×70; the head rises above it), never rotated, mirrored for left; a cool tint (`#dbe3e6`) to sit in the water; red tint when hurt, flicker while invulnerable. The deliberately larger presentation keeps the player readable against the 3D sea.
 - **Cranium:** as stardust rises it swells out of the top of the headwrap (per-frame head position), translucent and veined, with faint motes inside. It leaks stardust particles in proportion to stardust %.
 
 ### 4.1 Animation
 
 | State | Sprite |
 |---|---|
-| Idle, focus | idle cycle, 4 fps |
+| Idle, focus | walking frame 1, held |
 | Running on land | run cycle, 6–14 fps with speed |
 | Airborne on land | run frame 2 rising, frame 4 falling |
-| In the water (falling in, swimming, sinking) | idle cycle at a slow 2.5 fps, a drift (never the walk cycle) |
+| In the water (falling in, swimming, sinking) | walking frame 1, held as a drift pose |
 | Stroke (Space) | body squashes ~8% |
 | Wand strike | attack frames 1, 2, 5, 6 over 0.36 s (raise, thrust, recover) |
 | Star bolt | attack frame 3 (thrust with aura) then 4 (open-palm aura) |
 | Flare | attack frame 4, held |
 
 On top of the sprite: a slow breathing bob and a squash on each stroke. The player never rotates.
+
+### 4.1b Production animation workflow
+
+The AI-made walking illustrations in `docs/Frame-Concepts/` are **pose and design reference**, not a final animation source. Independently generated full-body frames vary in proportions, planted feet, stride timing, body weight, braid placement and cloth folds. Beautiful individual images are not enough: a shipping walk must have coherent mechanics, a fixed root and a clean loop.
+
+**Preferred workflow (solo, free):** clean and layer the art in Krita; animate a 2D cutout rig in Blender; bake the result to a transparent PNG sprite sheet; paint over the exported frames in Krita where needed. Blender gives reusable armatures and foot IK; the baked sheet remains compatible with the native raylib atlas and is the simplest export for Godot too. The rig establishes timing and consistent pivots; the paint-over retains the polished hand-painted look.
+
+**Alternatives and trade-offs:** manual frame-by-frame work in Krita gives the best final drawing quality but is slow; Godot `Skeleton2D` is useful when runtime aiming or procedural motion is required but is not the preferred art-authoring environment; DragonBones is a viable free 2D skeletal option but adds exporter/runtime integration; Synfig can make cutout animation but is less suited to this game pipeline; a rigged 3D character rendered as 2D gives the strongest long-term consistency but has the largest modelling, texturing and style-matching cost. Do not solve this by requesting more independently generated full-body frames.
+
+**Preparation:** select one walking image as the canonical design, or make a clean neutral three-quarter standing pose from it. In Krita, paint over and lock the proportions: head, torso, pelvis, arms, legs, braid thickness, wrapper, sash, cloth-panel lengths and ornaments. Use the other AI frames only as motion reference. Extend paint behind every joint before cutting: rotating parts need hidden overlap, not exposed hard edges.
+
+**Layer plan:** root/pelvis; rear thigh → shin → foot; front thigh → shin → foot; torso; rear and front upper arm → forearm → hand; neck/head/wrapper; rear and front cloth panels; four braid roots, each with three or four segments; and foreground ornaments. Keep rear braids and cloth behind the rear limbs, torso/pelvis in the middle, front limbs and cloth forward. Use rigid pieces for limbs and a few mesh-deformed pieces for larger cloth panels; do not split every painted fold.
+
+**Walk construction:** make an **in-place** 8–12-frame cycle. Gameplay moves the character root; animation never translates it horizontally. Twelve frames are preferred: left contact, transition, down/recoil, passing, transition, up, right contact, transition, down/recoil, passing, transition, up; the next left-contact pose is frame 0 again and is not exported twice. For eight frames, retain the same landmarks: left contact/down/passing/up then right contact/down/passing/up. Animate legs as a plain rig before adding detail; if the planted foot is not obvious then the finished silhouette will not read.
+
+**Alignment and weight:** use one ground guide (`y = 0`) and one root pivot centred between the feet. The root has no horizontal animation. During contact and down, lock that foot's IK target in world space; it must not slide. The pelvis is lowest on down poses and highest on passing/up poses, with a small side shift toward the planted leg. Counter-rotate shoulders against the pelvis and keep the head comparatively stable. Export every frame on the same transparent canvas, with the same baseline/pivot metadata.
+
+**Braids and cloth:** they are secondary motion, never the primary read. Each braid is a short chain: root follows the head/torso, mid sections lag roughly 2–3 frames, tips lag 3–5, and each braid uses a different smaller offset. Keep most movement behind the body silhouette and reduce it at foot-contact poses. Cloth is anchored at shoulder, belt or pelvis, follows the body first, then settles with delayed follow-through. If the player cannot immediately identify the planted foot, simplify braid and cloth motion.
+
+**Export:** render transparent PNG frames at 2×–4× target resolution, on a common canvas; pack the frames into a sprite sheet; retain the common foot pivot; and trigger footsteps from contact frames rather than arbitrary elapsed time. For Godot, import the sheet as `SpriteFrames`/`AnimatedSprite2D` or an `AnimationPlayer`; keep movement in code. For this game, rebuild `assets/player.png` and `assets/player.json` with the same rule.
+
+**Compromise:** raw cutout animation can look like a paper doll, and extreme perspective twists or complex cloth reveal seams. Use the rig for reliable timing and planted feet, then paint over exported frames to repair joints, silhouette, contact shadows and important folds. A clean 8–12-frame corrected cycle is more valuable than a larger set of inconsistent AI images.
 
 ### 4.2 Post-processing (`shaders/post.fs`)
 
@@ -78,13 +108,12 @@ The 3D background, the 3D near-pass layer and the 2D world are composited by one
 
 ## 5. Core mechanics
 
-### 5.1 Mana → blood → stardust
-- Spells cost mana (each its own `mana` in `data/moves.json`). If mana is short, the **missing amount is paid in HP** at the spell's own `bloodRatio` (HP per mana point; 1.2 for all spells: blood costs 20% more than mana).
-- Why above 1: with focus turning mana into HP (33 → 25, 0.76 HP per mana), a `bloodRatio` of 0.6 made blood a profit: 1 mana → 0.76 HP → 1.26 mana of spells. Above 0.76 (1 / 1.32) the round trip loses, so blood is a real sacrifice. The reward has to be worth it: seals, hidden pickups and stronger spells (below).
-- Every mana point paid in blood adds `dustPerBlood` % **stardust**. Stardust is permanent by default (`dustDecay` = 0).
+### 5.1 Mana and stardust
+- Spells cost mana (each its own `mana` in `data/moves.json`) and require the full cost before they start. Low mana blocks the spell; it never consumes HP or stardust.
+- Stardust is gained from dust vials, dust zones and pressure in the deep. Stardust is permanent by default (`dustDecay` = 0).
 - Stardust raises spell power: `power = 1 + dust/100 × dustPower`.
 - Stardust raises sight in the dark: `sight = lightBase + dust × dustLight` (+ flare).
-- 100% stardust = death ("your mind scattered"). Blood-casting at 0 HP also kills you.
+- 100% stardust = death ("your mind scattered").
 
 ### 5.1b Land and water
 - The sea surface is y = 0. With the chest above it the player is **on land**; below it the swimming rules apply (`sink`, `stroke`, `swim`): gravity changes at the surface.
@@ -104,20 +133,20 @@ The 3D background, the 3D near-pass layer and the 2D world are composited by one
 |---|---|---|
 | Wand | J (tap) | Melee, `slash`, 10, gives mana on a hit. |
 | Thrust | J held 0.45 s, released | Charged melee, `pierce`, 26, longer reach, lunges forward; a glint and a raised spear show the charge (like Hollow Knight's nail arts). Breaks shells. |
-| Star bolt | K | Spell, 25 mana, `star`, scales with stardust. The only thing that opens seals. |
-| Flare | L | Spell, 35 mana, `light` burst around you and 300 px of light for 2.5 s. |
-| Star leap | Space in the air (land) | Spell, 12 mana: a second jump (+~93 px). Magic as movement: you spend mana all the time, and blood when you overreach. |
+| Star bolt | K | Spell, 15 mana, `star`, scales with stardust. The only thing that opens seals. |
+| Flare | L | Spell, 20 mana, `light` burst around you and 300 px of light for 2.5 s. |
+| Star leap | Space in the air (land) | Spell, 8 mana: a second jump (+~93 px). Magic as movement: it requires mana, so position and melee recovery matter. |
 | Dodge | Shift | A 0.18 s dash with 0.25 s of invulnerability; 0.7× in the water. |
 | Parry | U | A 0.2 s window: a touch inside it does no harm, stuns the enemy 1.4 s, hits it back, and gives 22 mana. |
 
 Each move has a `group` cooldown, a `medium` (`any`, `water`, `land`, `ground`, `air`) and a `noise` that listeners hear.
 
 ### 5.2c Stardust as a key
-- **Seals** (`seal` on a solid): violet-veined rock with a ring of motes, one per 10 % of stardust it wants, lit for each 10 % you carry. A star bolt opens it only with that much stardust; less glances off ("The seal drinks the bolt. It wants more of your mind."). Paid for with blood, vials, dust zones or pressure.
+- **Seals** (`seal` on a solid): violet-veined rock with a ring of motes, one per 10 % of stardust it wants, lit for each 10 % you carry. A star bolt opens it only with that much stardust; less glances off ("The seal drinks the bolt. It wants more of your mind."). Stardust comes from vials, dust zones or pressure.
 - **Hidden pickups** (`hidden` on items and wrappers): seen and taken only inside your light, and with a number, only with that much stardust: a mind far enough gone sees it.
 
 ### 5.3 Focus
-- Hold F, standing still: spend `focusCost` mana over `focusTime` s to heal `focusHeal` HP. Cannot be paid in blood.
+- Hold F, standing still: spend `focusCost` mana over `focusTime` s to heal `focusHeal` HP.
 
 ### 5.4 Light and being seen (abyss)
 - Darkness thickens slowly with depth, capped at 68% (reached around 400 m). You see clearly only inside your light; the post pass keeps the deep dark teal, never dead black.
@@ -133,7 +162,6 @@ Each move has a `group` cooldown, a `medium` (`any`, `water`, `land`, `ground`, 
 |---|---|---|
 | maxHp / maxMana | 100 / 100 | |
 | manaRegen | 3 | mana/s |
-| dustPerBlood | 0.3 | stardust % per mana paid in blood |
 | dustPower | 1.5 | spell damage bonus at 100% dust |
 | dustDecay | 0 | stardust %/s recovered |
 | lightBase | 160 | px of sight with intact brain |
@@ -164,7 +192,7 @@ Types live in `data/enemies.json` (F2 → Enemies): a `behaviour` (`stalker` or 
 
 ## 7b. World: areas and biomes
 
-The game is a set of **areas**. Each area is a **biome**: its own ground and liquid, palette and light, creatures, hazards, sound, lore, and **one twist on the core mechanic** (mana → blood → stardust). Levels are built inside an area; an area can hold several levels.
+The game is a set of **areas**. Each area is a **biome**: its own ground and liquid, palette and light, creatures, hazards, sound, lore, and **one twist on the core mechanic** (mana and stardust). Levels are built inside an area; an area can hold several levels.
 
 ### What a biome defines
 | Part | Examples |
@@ -175,7 +203,7 @@ The game is a set of **areas**. Each area is a **biome**: its own ground and liq
 | Background | 3D decor (skulls, tower) or painted layers; fog colour and density |
 | Creatures | the enemy roster of `data/enemies.json` that lives there, and its boss |
 | Hazards | dust zones, pressure, spawners, liquids that hurt |
-| Twist on the core mechanic | what blood, mana or stardust means here |
+| Twist on the core mechanic | what mana or stardust means here |
 | Sound | drone colour, creature voices, ambience |
 | Fear | each biome has its own phobia, as the sea has thalassophobia |
 | Lore | who lived or died here, and why the place is the way it is |
@@ -215,17 +243,17 @@ Art: `docs/Concept-Arts/LakeOfBlood.jpeg` to `LakeOfBlood4.jpeg` (escalating: th
   - **The brood mother:** a bloated grub with about ten eyes, spindly legs and vestigial wings. The area's boss.
 - **Fear:** the swarm; insects that drink you.
 - **Gameplay ideas (proposals):**
-  - Mosquito: a flying chaser (the first flying enemy above land) that senses **blood**: it notices you while you bleed or just after you blood-cast. Its bite drains HP and heals it, and its abdomen visibly swells.
+  - Mosquito: a flying chaser (the first flying enemy above land) that senses **injury**: it notices you after enemy damage. Its bite drains HP and heals it, and its abdomen visibly swells.
   - Egg clusters: destructible spawners that release larvae on a timer, so you choose between pushing on and clearing them.
   - Larvae: slow ground crawlers (the first enemies that walk).
   - The brood mother: a boss fight in the blood.
-- **Twist on the core mechanic (proposal):** the lake is blood you did not pay. Spells cast while standing in it take their blood price from the lake instead of from you, but blood in the water draws the swarm.
-- **Open question:** whose blood is it? A battle, a massacre of blood-casters, or something the mosquitoes carried here? The human faces suggest the swarm carries what it drank.
+- **Twist on the core mechanic (proposal):** the lake is a dangerous mana well: standing in it restores mana, but its pulse draws the swarm.
+- **Open question:** whose blood is it? A battle, a massacre of mages, or something the mosquitoes carried here? The human faces suggest the swarm carries what it drank.
 
 ### What the engine needs for biomes (proposal)
 - **Today:** a level sets its fog `palette`, `props`, 3D `decor` and per-solid `tile` style; the sky (sunset), the liquid (sea water with fixed rules), the tileset (Craftpix World Tree Roots) and the drone are the same everywhere.
 - **Needed:** a level names its biome, and `data/biomes.json` defines each one: sky colours, liquid (colour and rules: swim, wade, blood), tile family, background, drone and ambience, and the creature roster. Like moves and enemies, it is data, edited on the F2 pages.
-- **Enemies:** flying (not held under the surface), walking (gravity on land), spawners, bosses, a new `blood` sense, and resistance that depends on facing.
+- **Enemies:** flying (not held under the surface), walking (gravity on land), spawners, bosses, an injury sense, and resistance that depends on facing.
 - **Art:** the concept art sets mood and colour. Creatures in game need **side-view sprite sheets** (consistent frames on a plain background, as the player's sheet), or a procedural drawing first, as the jelly and the leech have.
 
 ## 8. Level: the Abyss (prototype)
@@ -240,12 +268,12 @@ Art: `docs/Concept-Arts/LakeOfBlood.jpeg` to `LakeOfBlood4.jpeg` (escalating: th
   - 2D drawn skull and cracks remain only as a fallback if the skull model fails to load.
 - **Pocket universe:** open space, low gravity, galaxy backdrop, floating platforms, escaped thoughts, golden altar = end of run ("A mind, still dreaming inside its skull"). Blue crack returns to the seafloor.
 
-## 9. Audio (procedural, Web Audio)
+## 9. Audio (procedural)
 
 - Drone: low-passed brown noise + beating low sines; louder and darker with depth.
 - Leviathan groans (far: quiet; near: loud with screen shake).
 - Heartbeat driven by **fear** = depth + missing HP + nearby lurkers + near pass. Tempo 50–140 bpm, silent below 0.3 fear.
-- SFX: cast hiss, blood-cast wet hiss, flare sweep, hurt thump, lurker lunge hiss, swim stroke.
+- SFX: cast hiss, flare sweep, hurt thump, lurker lunge hiss, swim stroke.
 
 ## 10. Lore
 
@@ -265,7 +293,7 @@ Art: `docs/Concept-Arts/LakeOfBlood.jpeg` to `LakeOfBlood4.jpeg` (escalating: th
 ## 11. Planned / backlog
 
 - [ ] **Escaped calamities:** at high stardust, your leaking mind spawns hostile creatures.
-- [ ] **Helmets** as builds: each modifies crack thresholds, light, pressure resistance, blood ratio.
+- [ ] **Helmets** as builds: each modifies crack thresholds, light, pressure resistance and mana efficiency.
 - [ ] **Skull wands:** each carries a dead mage's signature spell.
 - [ ] **Giant skull dungeon** (playable).
 - [x] Spells as traversal: the star leap. Still open: blink, levitate, wall-break.
@@ -303,7 +331,7 @@ A cliff-top fishing village at sunset (two huts, a fire, villagers watching the 
 ### New level mechanics (native build)
 | Field | Effect |
 |---|---|
-| `wrappers` | Pickups. `mana` +3 mana regen; `focus` focus time ×0.6; `protection` +25 max HP and heal; `dust` stardust per blood ×0.6. Reset on restart. |
+| `wrappers` | Pickups. `mana` +3 mana regen; `focus` focus time ×0.6; `protection` +25 max HP and heal; `dust` deep-pressure stardust gain ×0.6. Reset on restart. |
 | `dustZones` | Inside: +`rate` stardust %/s, strong refraction/aberration warp, HUD warning. |
 | `texts` | Inscriptions fade in within ~220 px; a whisper plays the first time. |
 | `lights` | Static lights: open the darkness and glow. |
@@ -332,10 +360,10 @@ Lower path: crates to hop, a fire and a villager.
 - **Level editor server:** `python3 serve.py` (stdlib only; binds 127.0.0.1) serves the editor, and accepts `PUT /api/levels/<name>.json` (name restricted to `[A-Za-z0-9_-]`, body must be a level object, written atomically). `GET /api/levels` lists levels. three.js r128 + GLTFLoader are vendored in `vendor/`.
 - **Levels** are data in `levels/*.json`: `name, width, height (seafloor, px), spawn, portal, emptyCrack (crack centres), solids [{x,y,w,h}], lurkers [{x,y}]`. The game takes the level path as its first argument (default `levels/abyss.json`); `--spawn x,y` overrides the start. `levels/abyss.json` is the former procedural shaft, exported with the same seed.
 - **Editor** (`editor.html`): pan/zoom canvas with depth ruler; tools: select/move (corner-resize walls), draw wall, lurker, spawn, portal crack, empty crack; inspector for level name/width/depth and selection x/y/w/h; undo/redo, duplicate, nudge, 10 px snap, frame; Save, Copy play command, Copy from view.
-- **Native game** (root: `src/`, `shaders/`, `CMakeLists.txt`; raylib 5.5, C++20): the game (the web prototype it was ported from was removed on 2026-10-27). Layers: 3D background → 2D world + darkness (premultiplied) → 3D near pass → post shader (`shaders/post.fs`, same effects as the web pass) → HUD. 3D models from `assets/*.glb` (vertex colours converted to 8-bit RGBA for raylib), lighting/fog in `shaders/scene.*` with 4 point lights. Procedural audio (`src/synth.hpp`). Code layout: `World` (simulation, no drawing) / `Scene3D` / `Renderer` (passes, scenery, actors, HUD) / `Panel` (generic live-edit list: the tune menu is one, any object can have its own) / `Character` + `Animator` (data-driven sprite sheet and animation state machine, `characters/*.json`). Text is rasterised at its exact pixel size per size used (font cache) and drawn on whole pixels so it stays crisp; inscriptions are drawn in screen space. Tunables in `tunables.json`: edited live in the **F2/Tab tune menu** (grouped Land, Water, Body, Blood & stardust, Spells, Light, Enemies; pauses the game). Keyboard: arrows select/adjust, Shift ×10, Ctrl ×0.1, Backspace resets, S saves. Mouse: hover, click a row, wheel scrolls, −/+ buttons, drag a value to scrub (6 px per step), right-click resets, Save / Defaults / Close buttons, or by hand and reloaded with F5 together with the level. Gamepad supported. `--shot N file.png` renders headless for checks.
+- **Native game** (root: `src/`, `shaders/`, `CMakeLists.txt`; raylib 5.5, C++20): the game (the web prototype it was ported from was removed on 2026-10-27). Layers: 3D background → 2D world + darkness (premultiplied) → 3D near pass → post shader (`shaders/post.fs`, same effects as the web pass) → HUD. 3D models from `assets/*.glb` (vertex colours converted to 8-bit RGBA for raylib), lighting/fog in `shaders/scene.*` with 4 point lights. Procedural audio (`src/synth.hpp`). Code layout: `World` (simulation, no drawing) / `Scene3D` / `Renderer` (passes, scenery, actors, HUD) / `Panel` (generic live-edit list: the tune menu is one, any object can have its own) / `Character` + `Animator` (data-driven sprite sheet and animation state machine, `characters/*.json`). Text is rasterised at its exact pixel size per size used (font cache) and drawn on whole pixels so it stays crisp; inscriptions are drawn in screen space. Tunables in `tunables.json`: edited live in the **F2/Tab tune menu** (grouped Land, Water, Body, Stardust, Spells, Light, Enemies; pauses the game). Keyboard: arrows select/adjust, Shift ×10, Ctrl ×0.1, Backspace resets, S saves. Mouse: hover, click a row, wheel scrolls, −/+ buttons, drag a value to scrub (6 px per step), right-click resets, Save / Defaults / Close buttons, or by hand and reloaded with F5 together with the level. Gamepad supported. `--shot N file.png` renders a hidden-window capture for checks; it still needs a desktop graphics/display context.
 - Not yet editable in the editor: the pocket universe layout, and the native-only fields (wrappers, dust zones, texts, lights, thoughts, decor, palette); the editor preserves them when saving.
 
-## 13. Prototypes
+## Prototypes
 
 | File | What | Status |
 |---|---|---|
@@ -344,7 +372,11 @@ Lower path: crates to hop, a fire and a villager.
 | `characters/*.json` | Characters: sprite sheet + animation state machine (format in README) | Active |
 
 
-## 13. Changelog
+## Changelog
+
+- **2026-10-29** Magic now requires mana only: an unaffordable spell does not fire, and casting never spends HP or creates stardust. Star bolt / flare / star leap costs are temporarily 15 / 20 / 8 mana. Stardust comes from vials, zones and deep pressure; the dust wrapper now reduces deep-pressure gain.
+
+- **2026-10-29** Art documentation: `docs/README.md` now defines the reference library, biome briefs and the braided African warrior-mage as the canonical player direction. The current atlas is explicitly transitional: only its new walk row follows that direction; legacy idle/attack frames need replacement. Player presentation height is 116 world px (from 96) for readability.
 
 - **2026-10-28** Performance (Android was slow): graphics quality Low / Medium / High (menu, `settings.json`, `--quality`; Medium on phones). The post shader no longer samples three scenes and a 16-tap bloom per pixel: a merge pass combines them once, bloom is a separate pass at a quarter size, god rays take 8 steps at Medium (brightness kept). The 3D background renders at half size below High. 3D statics outside the view are culled (bounding spheres), and small skulls draw a 5k-triangle simplified mesh instead of 26k. `F3` / Timings: per-pass timings on screen; `--profile`. On a software-rendered 1280×720 desktop the post pass went from ~110 ms to ~25–40 ms (Medium) and ~13 ms (Low); the deepest abyss's 3D pass from ~74 to ~49 ms.
 
